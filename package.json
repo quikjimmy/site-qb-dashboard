@@ -1,0 +1,9 @@
+{
+  "name": "site-qb-dashboard",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "npx serve ."
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
