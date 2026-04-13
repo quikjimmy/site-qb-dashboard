@@ -6,9 +6,10 @@
     }
   },
   "routes": [
-    { "src": "/auth/(.*)", "dest": "/api/auth/$1" },
-    { "src": "/api/qb/(.*)", "dest": "/api/qb.js" },
     { "src": "/api/me", "dest": "/api/me.js" },
-    { "src": "/api/test", "dest": "/api/test.js" }
+    { "src": "/api/test", "dest": "/api/test.js" },
+    { "src": "/api/qb/(.*)", "dest": "/api/qb.js" },
+    { "src": "/auth/start", "dest": "/api/auth/start.js" },
+    { "src": "/auth/callback", "dest": "/api/auth/callback.js" }
   ]
 }
