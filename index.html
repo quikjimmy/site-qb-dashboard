@@ -256,8 +256,8 @@
         <h3>🏆 Sales Rep Leaderboard</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP %</th><th>Invoices</th></tr></thead>
-            <tbody id="leaderboard-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
+            <tbody id="leaderboard-tbody"><tr><td colspan="8" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -749,26 +749,43 @@ function renderRepChart(rows) {
 
 function renderLeaderboard(rows, classPL) {
   const tbody = $('leaderboard-tbody');
-  const invoiceCount = new Map();
+  const stats = new Map();
   for (const r of rows) {
     const key = r.rep || 'Unassigned';
-    invoiceCount.set(key, (invoiceCount.get(key) || 0) + 1);
+    const s = stats.get(key) || { count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0 };
+    s.count++;
+    if (!r.paid) {
+      s.openCount++;
+      s.openBal += r.balance;
+      if (r.status === 'overdue') {
+        s.overdueCount++;
+        s.overdueBal += r.balance;
+      }
+    }
+    stats.set(key, s);
   }
+  const empty = { count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0 };
   const combined = new Map();
   for (const [key, pl] of (classPL || new Map())) {
-    combined.set(key, { revenue: pl.income, cogs: pl.cogs, count: invoiceCount.get(key) || 0 });
+    combined.set(key, { ...(stats.get(key) || empty), revenue: pl.income, cogs: pl.cogs });
   }
-  for (const [key, count] of invoiceCount) {
-    if (!combined.has(key)) combined.set(key, { revenue: 0, cogs: 0, count });
+  for (const [key, s] of stats) {
+    if (!combined.has(key)) combined.set(key, { ...s, revenue: 0, cogs: 0 });
   }
   const sorted = [...combined.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
   if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(([name, agg], i) => {
     const gp = agg.revenue > 0 ? ((agg.revenue - agg.cogs) / agg.revenue) * 100 : 0;
     const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
+    const openCell = agg.openCount
+      ? `<strong>${agg.openCount}</strong><div style="font-size:.75rem;color:var(--text2);">${fmt(agg.openBal)}</div>`
+      : '<span style="color:var(--text2);">—</span>';
+    const overdueCell = agg.overdueCount
+      ? `<strong style="color:var(--red);">${agg.overdueCount}</strong><div style="font-size:.75rem;color:var(--red);">${fmt(agg.overdueBal)}</div>`
+      : '<span style="color:var(--text2);">—</span>';
     return `
       <tr>
         <td class="leaderboard-rank ${i < 3 ? 'top' : ''}">${rank}</td>
@@ -776,6 +793,8 @@ function renderLeaderboard(rows, classPL) {
         <td class="leaderboard-amt">${fmt(agg.revenue)}</td>
         <td>${fmt(agg.cogs)}</td>
         <td><strong>${pct(gp)}</strong></td>
+        <td>${openCell}</td>
+        <td>${overdueCell}</td>
         <td style="color:var(--text2);">${agg.count}</td>
       </tr>
     `;
