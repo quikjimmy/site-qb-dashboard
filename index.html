@@ -234,8 +234,8 @@ async function qbQuery(sql) {
 }
 
 function logout() {
-  isDemoMode = false; realmId = null;
-  showLogin();
+  if (isDemoMode) { isDemoMode = false; realmId = null; showLogin(); return; }
+  window.location.href = '/api/auth/logout';
 }
 
 function showLogin() {

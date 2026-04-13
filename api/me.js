@@ -1,16 +1,11 @@
-// GET /api/me - Returns session info
-export default function handler(req, res) {
-  const cookies = req.headers.cookie || '';
-  const sessionMatch = cookies.match(/qb_session=([^;]+)/);
-  
-  if (!sessionMatch) {
-    return res.status(401).json({ error: 'Not authenticated' });
+const { getSession } = require('../lib/session');
+
+module.exports = (req, res) => {
+  const s = getSession(req);
+  if (!s) {
+    res.statusCode = 401;
+    return res.end();
   }
-  
-  try {
-    const session = JSON.parse(Buffer.from(sessionMatch[1], 'base64').toString());
-    res.json({ realmId: session.realmId });
-  } catch {
-    res.status(401).json({ error: 'Invalid session' });
-  }
-}
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({ realmId: s.realmId }));
+};

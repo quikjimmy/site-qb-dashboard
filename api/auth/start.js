@@ -1,20 +1,26 @@
-// GET /auth/start - Redirect to Intuit OAuth
-import crypto from 'crypto';
+const crypto = require('crypto');
+const { serializeCookie, appendSetCookie, STATE_COOKIE } = require('../../lib/session');
+const { QB_CLIENT_ID, QB_REDIRECT_URI } = require('../../lib/config');
 
-export default function handler(req, res) {
-  const clientId = process.env.QB_CLIENT_ID || 'ABe6ocRw3PPrmyMyQ3kMFGcDPETjat2022TVrysCHVZvTJ0xt2';
-  const redirectUri = process.env.QB_REDIRECT_URI || 'https://qb-dashboard-snowy.vercel.app/api/auth/callback';
-  const scope = 'com.intuit.quickbooks.accounting';
+module.exports = (req, res) => {
+  const clientId = QB_CLIENT_ID;
+  const redirectUri = QB_REDIRECT_URI;
+  if (!clientId || !redirectUri) {
+    res.statusCode = 500;
+    return res.end('Server misconfigured: QB_CLIENT_ID / QB_REDIRECT_URI missing');
+  }
+
   const state = crypto.randomBytes(16).toString('hex');
-  
-  res.setHeader('Set-Cookie', `oauth_state=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`);
-  
-  const authUrl = `https://appcenter.intuit.com/connect/oauth2?` +
-    `client_id=${clientId}&` +
-    `scope=${scope}&` +
-    `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-    `response_type=code&` +
-    `state=${state}`;
-  
-  res.redirect(authUrl);
-}
+  appendSetCookie(res, serializeCookie(STATE_COOKIE, state, { maxAge: 600 }));
+
+  const url = new URL('https://appcenter.intuit.com/connect/oauth2');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('scope', 'com.intuit.quickbooks.accounting');
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('state', state);
+
+  res.statusCode = 302;
+  res.setHeader('Location', url.toString());
+  res.end();
+};
