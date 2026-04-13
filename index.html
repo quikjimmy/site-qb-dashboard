@@ -121,15 +121,16 @@
   .chip.active { background: var(--qb-blue); border-color: var(--qb-blue); color: #fff; }
 
   /* Status breakdown */
-  .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+  .status-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
   .status-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); display: flex; align-items: center; gap: 20px; }
   .status-card .left { flex: 1; }
   .status-card .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); margin-bottom: 6px; }
   .status-card .value { font-size: 1.5rem; font-weight: 700; }
   .status-card .sub { font-size: .82rem; color: var(--text2); margin-top: 4px; }
   .status-card.open .value { color: var(--orange); }
+  .status-card.overdue .value { color: var(--red); }
   .status-card.paid .value { color: var(--qb-green); }
-  .status-card .right { width: 90px; height: 90px; }
+  .status-card .right { width: 80px; height: 80px; }
 
   /* Leaderboard */
   .leaderboard-row { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; padding: 10px 0; align-items: center; border-bottom: 1px solid #f0f0f0; }
@@ -169,6 +170,9 @@
 
   @media (max-width: 900px) {
     .status-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 1100px) and (min-width: 901px) {
+    .status-grid { grid-template-columns: repeat(2, 1fr); }
   }
 </style>
 </head>
@@ -241,6 +245,14 @@
             <div class="sub" id="status-open-sub">—</div>
           </div>
           <div class="right"><canvas id="chart-status-open"></canvas></div>
+        </div>
+        <div class="status-card overdue">
+          <div class="left">
+            <div class="label">Overdue Invoices</div>
+            <div class="value" id="status-overdue-amt">—</div>
+            <div class="sub" id="status-overdue-sub">—</div>
+          </div>
+          <div class="right"><canvas id="chart-status-overdue"></canvas></div>
         </div>
         <div class="status-card paid">
           <div class="left">
@@ -496,7 +508,7 @@ function loadDemoData() {
   const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
   populateInvoiceRepFilter(rows);
   renderStatusBreakdown(rows);
-  renderRepChart(rows);
+  renderRepChart(rows, demoClassPL);
   renderLeaderboard(rows, demoClassPL);
   renderAttention(rows);
   renderPivot(rows);
@@ -729,19 +741,24 @@ function buildRows(rawInvoices, paymentMap, repFilter) {
 // Renderers driven by shared invoice data
 
 function renderStatusBreakdown(rows) {
-  const paid = rows.filter(r => r.paid);
-  const open = rows.filter(r => !r.paid);
-  const paidTotal = paid.reduce((s, r) => s + r.amount, 0);
+  const open = rows.filter(r => r.status === 'open');
+  const overdue = rows.filter(r => r.status === 'overdue');
+  const paid = rows.filter(r => r.status === 'paid');
   const openTotal = open.reduce((s, r) => s + r.balance, 0);
+  const overdueTotal = overdue.reduce((s, r) => s + r.balance, 0);
+  const paidTotal = paid.reduce((s, r) => s + r.amount, 0);
   const total = rows.length;
-  const openPct = total ? (open.length / total) * 100 : 0;
-  const paidPct = total ? (paid.length / total) * 100 : 0;
+  const share = n => total ? (n / total * 100).toFixed(1) : '0.0';
+  const sub = (count, p) => `${count} invoice${count === 1 ? '' : 's'} · ${p}% of total`;
   $('status-open-amt').textContent = fmt(openTotal);
-  $('status-open-sub').textContent = `${open.length} invoice${open.length === 1 ? '' : 's'} · ${openPct.toFixed(1)}% of total`;
+  $('status-open-sub').textContent = sub(open.length, share(open.length));
+  $('status-overdue-amt').textContent = fmt(overdueTotal);
+  $('status-overdue-sub').textContent = sub(overdue.length, share(overdue.length));
   $('status-paid-amt').textContent = fmt(paidTotal);
-  $('status-paid-sub').textContent = `${paid.length} invoice${paid.length === 1 ? '' : 's'} · ${paidPct.toFixed(1)}% of total`;
-  renderMiniDonut('chart-status-open', open.length, paid.length, '#fb8c00');
-  renderMiniDonut('chart-status-paid', paid.length, open.length, '#4caf50');
+  $('status-paid-sub').textContent = sub(paid.length, share(paid.length));
+  renderMiniDonut('chart-status-open', open.length, total - open.length, '#fb8c00');
+  renderMiniDonut('chart-status-overdue', overdue.length, total - overdue.length, '#e53935');
+  renderMiniDonut('chart-status-paid', paid.length, total - paid.length, '#4caf50');
 }
 
 function renderMiniDonut(canvasId, primary, secondary, color) {
@@ -755,11 +772,27 @@ function renderMiniDonut(canvasId, primary, secondary, color) {
   });
 }
 
-function renderRepChart(rows) {
+function renderRepChart(rows, classPL) {
+  // Match leaderboard: use P&L Total Income per Class (excludes sales tax,
+  // non-income lines). Fall back to summed invoice totals if the P&L
+  // report failed to load.
   const byRep = new Map();
-  for (const r of rows) {
-    const key = r.rep || 'Unassigned';
-    byRep.set(key, (byRep.get(key) || 0) + r.amount);
+  if (classPL && classPL.size) {
+    for (const [name, pl] of classPL) byRep.set(name, pl.income || 0);
+    // Also show reps that appear in invoices but not in classPL (typically
+    // Unassigned, since rows without a Class are not in the class-grouped P&L).
+    const seen = new Set(byRep.keys());
+    const fallback = new Map();
+    for (const r of rows) {
+      const key = r.rep || 'Unassigned';
+      if (!seen.has(key)) fallback.set(key, (fallback.get(key) || 0) + r.amount);
+    }
+    for (const [k, v] of fallback) byRep.set(k, v);
+  } else {
+    for (const r of rows) {
+      const key = r.rep || 'Unassigned';
+      byRep.set(key, (byRep.get(key) || 0) + r.amount);
+    }
   }
   const sorted = [...byRep.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
   if (!sorted.length) {
@@ -971,7 +1004,7 @@ async function refreshDashboard() {
       _lastRows = rows;
       populateInvoiceRepFilter(rows);
       renderStatusBreakdown(rows);
-      renderRepChart(rows);
+      renderRepChart(rows, classPL);
       renderLeaderboard(rows, classPL);
       renderAttention(rows);
       renderPivot(rows);
