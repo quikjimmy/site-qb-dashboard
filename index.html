@@ -96,6 +96,56 @@
   }
 
   .hidden { display: none !important; }
+
+  /* Quick filter chips */
+  .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .chip { background: #fff; border: 1px solid var(--border); color: var(--text2); padding: 6px 14px; border-radius: 999px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: all .15s; }
+  .chip:hover { border-color: var(--qb-blue); color: var(--qb-blue); }
+  .chip.active { background: var(--qb-blue); border-color: var(--qb-blue); color: #fff; }
+
+  /* Status breakdown */
+  .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px; }
+  .status-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); display: flex; align-items: center; gap: 20px; }
+  .status-card .left { flex: 1; }
+  .status-card .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); margin-bottom: 6px; }
+  .status-card .value { font-size: 1.5rem; font-weight: 700; }
+  .status-card .sub { font-size: .82rem; color: var(--text2); margin-top: 4px; }
+  .status-card.open .value { color: var(--orange); }
+  .status-card.paid .value { color: var(--qb-green); }
+  .status-card .right { width: 90px; height: 90px; }
+
+  /* Leaderboard */
+  .leaderboard-row { display: grid; grid-template-columns: 36px 1fr auto auto; gap: 12px; padding: 10px 0; align-items: center; border-bottom: 1px solid #f0f0f0; }
+  .leaderboard-row:last-child { border-bottom: none; }
+  .leaderboard-rank { font-weight: 700; color: var(--text2); font-size: .85rem; }
+  .leaderboard-rank.top { color: var(--qb-blue); }
+  .leaderboard-name { font-weight: 500; }
+  .leaderboard-count { font-size: .78rem; color: var(--text2); }
+  .leaderboard-amt { font-weight: 600; color: var(--qb-blue); }
+
+  /* Attention panel */
+  .attention-list { display: flex; flex-direction: column; gap: 8px; }
+  .attention-item { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; padding: 10px 12px; border-radius: 6px; background: #fff8e1; border-left: 3px solid var(--orange); align-items: center; font-size: .85rem; }
+  .attention-item.overdue { background: #ffebee; border-left-color: var(--red); }
+  .attention-item.missing-rep { background: #fff3e0; }
+  .attention-reason { font-size: .72rem; text-transform: uppercase; letter-spacing: .3px; color: var(--text2); font-weight: 600; }
+  .attention-empty { padding: 20px; text-align: center; color: var(--text2); font-size: .9rem; }
+
+  /* Pivot */
+  .pivot-controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; font-size: .85rem; color: var(--text2); }
+  .pivot-controls select { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: .85rem; }
+
+  /* Payment method chip in table */
+  .pay-chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .72rem; font-weight: 600; }
+  .pay-chip.cc { background: #e3f2fd; color: #1565c0; }
+  .pay-chip.cash { background: #e8f5e9; color: #2e7d32; }
+  .pay-chip.check { background: #fff3e0; color: #e65100; }
+  .pay-chip.ach { background: #ede7f6; color: #5e35b5; }
+  .pay-chip.unknown { background: #eceff1; color: #546e7a; }
+
+  @media (max-width: 900px) {
+    .status-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -133,6 +183,15 @@
       <button class="apply-btn" onclick="refreshDashboard()">Apply</button>
     </div>
 
+    <!-- Quick filter chips -->
+    <div class="chip-row" id="chip-row">
+      <button class="chip" data-range="this-week">This Week</button>
+      <button class="chip" data-range="last-week">Last Week</button>
+      <button class="chip" data-range="this-month">This Month</button>
+      <button class="chip" data-range="last-month">Last Month</button>
+      <button class="chip" data-range="ytd">Year to Date</button>
+    </div>
+
     <!-- KPIs -->
     <div class="kpi-grid">
       <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
@@ -141,22 +200,72 @@
       <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
     </div>
 
-    <!-- Charts -->
+    <!-- Status breakdown: Open vs Paid (count / $ / %) -->
+    <div class="status-grid">
+      <div class="status-card open">
+        <div class="left">
+          <div class="label">Open Invoices</div>
+          <div class="value" id="status-open-amt">—</div>
+          <div class="sub" id="status-open-sub">—</div>
+        </div>
+        <div class="right"><canvas id="chart-status-open"></canvas></div>
+      </div>
+      <div class="status-card paid">
+        <div class="left">
+          <div class="label">Paid Invoices</div>
+          <div class="value" id="status-paid-amt">—</div>
+          <div class="sub" id="status-paid-sub">—</div>
+        </div>
+        <div class="right"><canvas id="chart-status-paid"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Charts: Revenue by Month + Sales by Rep -->
     <div class="charts-row">
       <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
-      <div class="chart-card"><h3>Sales by Rep / Class</h3><canvas id="chart-rep"></canvas></div>
+      <div class="chart-card"><h3>Sales by Rep</h3><canvas id="chart-rep"></canvas></div>
     </div>
-    <div class="charts-row single">
-      <div class="chart-card"><h3>Revenue vs COGS Trend</h3><canvas id="chart-trend"></canvas></div>
+
+    <!-- Leaderboard -->
+    <div class="table-card">
+      <h3>🏆 Sales Rep Leaderboard</h3>
+      <div id="leaderboard"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
+    </div>
+
+    <!-- Requires Attention -->
+    <div class="table-card">
+      <h3 id="attention-heading">⚠️ Requires Attention</h3>
+      <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
+    </div>
+
+    <!-- Pivot table -->
+    <div class="table-card">
+      <h3>Pivot Table</h3>
+      <div class="pivot-controls">
+        <label>Group by
+          <select id="pivot-dim">
+            <option value="rep">Sales Rep</option>
+            <option value="customer">Customer</option>
+            <option value="payment">Payment Method</option>
+            <option value="month">Month</option>
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th id="pivot-dim-header">Dimension</th><th>Invoices</th><th>Total $</th><th>Avg $</th><th>Open $</th></tr></thead>
+          <tbody id="pivot-tbody"><tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+        </table>
+      </div>
     </div>
 
     <!-- Invoices Table -->
     <div class="table-card">
-      <h3>Recent Invoices</h3>
+      <h3>Invoices in Range</h3>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
-          <tbody id="invoices-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Paid By</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+          <tbody id="invoices-tbody"><tr><td colspan="8" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -251,10 +360,28 @@ function showDashboard() {
   $('conn-status').classList.remove('hidden');
   $('conn-status').textContent = '🟢 Connected';
   $('logout-btn').classList.remove('hidden');
+  wireChips();
+  wirePivotDim();
   const [s, e] = defaultDateRange();
   $('filter-start').value = s;
   $('filter-end').value = e;
   refreshDashboard();
+}
+
+function wireChips() {
+  document.querySelectorAll('#chip-row .chip').forEach(chip => {
+    if (chip._wired) return;
+    chip._wired = true;
+    chip.addEventListener('click', () => setQuickRange(chip.dataset.range));
+  });
+}
+
+function wirePivotDim() {
+  const sel = $('pivot-dim');
+  if (sel && !sel._wired) {
+    sel._wired = true;
+    sel.addEventListener('change', () => renderPivot(_lastRows));
+  }
 }
 
 function showDemoDashboard() {
@@ -271,6 +398,8 @@ function showDemoDashboard() {
 
 function loadDemoData() {
   const d = DEMO_DATA;
+  wireChips();
+  wirePivotDim();
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
   $('kpi-cogs').textContent = fmt(d.kpis.cogs);
   $('kpi-profit').textContent = fmt(d.kpis.profit);
@@ -279,13 +408,28 @@ function loadDemoData() {
   $('kpi-cogs-sub').textContent = 'Q1-Q2 2026';
   $('kpi-profit-sub').textContent = 'Q1-Q2 2026';
   $('kpi-margin-sub').textContent = 'Q1-Q2 2026';
-  const revLabels = d.revenueByMonth.map(m => m.month);
-  const revValues = d.revenueByMonth.map(m => m.revenue);
-  renderBarChart('chart-revenue', revLabels, revValues, 'Revenue', '#2e7d32');
-  renderBarChart('chart-rep', d.salesByRep.map(r => r.rep), d.salesByRep.map(r => r.sales), 'Sales', '#1976d2');
-  const cogsValues = d.revenueByMonth.map(m => m.revenue * 0.48);
-  renderLineChart('chart-trend', revLabels, revValues, cogsValues);
-  renderInvoicesTable(d.invoices);
+  renderBarChart('chart-revenue', d.revenueByMonth.map(m => m.month), d.revenueByMonth.map(m => m.revenue), 'Revenue', '#2e7d32');
+
+  const rows = d.invoices.map(inv => ({
+    id: inv.docNum,
+    date: inv.date,
+    docNum: inv.docNum,
+    customer: inv.customer,
+    rep: d.salesByRep[Math.floor(Math.random() * d.salesByRep.length)]?.rep || null,
+    amount: inv.amount,
+    balance: inv.balance,
+    status: inv.status,
+    paid: inv.status === 'paid',
+    paymentMethod: inv.status === 'paid' ? 'Visa' : null,
+    dueDate: null,
+  }));
+  _lastRows = rows;
+  renderStatusBreakdown(rows);
+  renderRepChart(rows);
+  renderLeaderboard(rows);
+  renderAttention(rows);
+  renderPivot(rows);
+  renderInvoicesTable(rows);
   const repSelect = $('filter-rep');
   repSelect.innerHTML = '<option value="">All</option>';
   d.salesByRep.forEach(r => { repSelect.innerHTML += `<option value="${r.rep}">${r.rep}</option>`; });
@@ -293,16 +437,33 @@ function loadDemoData() {
 
 function renderInvoicesTable(invoices) {
   const tbody = $('invoices-tbody');
+  if (!invoices.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text2)">No invoices in range</td></tr>';
+    return;
+  }
   tbody.innerHTML = invoices.map(inv => `
     <tr>
-      <td>${inv.date}</td>
-      <td>${inv.docNum}</td>
-      <td>${inv.customer}</td>
+      <td>${inv.date || '—'}</td>
+      <td>${inv.docNum || '—'}</td>
+      <td>${inv.customer || '—'}</td>
+      <td>${inv.rep || '—'}</td>
+      <td>${renderPayChip(inv.paymentMethod)}</td>
       <td>${fmt(inv.amount)}</td>
       <td>${fmt(inv.balance)}</td>
-      <td><span class="badge ${inv.status}">${inv.status.toUpperCase()}</span></td>
+      <td><span class="badge ${inv.status}">${(inv.status || '').toUpperCase()}</span></td>
     </tr>
   `).join('');
+}
+
+function renderPayChip(method) {
+  if (!method) return '<span class="pay-chip unknown">—</span>';
+  const m = method.toLowerCase();
+  let cls = 'unknown';
+  if (/credit|visa|master|amex|discover/.test(m)) cls = 'cc';
+  else if (/cash/.test(m)) cls = 'cash';
+  else if (/check/.test(m)) cls = 'check';
+  else if (/ach|bank|e-?check|transfer/.test(m)) cls = 'ach';
+  return `<span class="pay-chip ${cls}">${method}</span>`;
 }
 
 // Chart renderers
@@ -396,75 +557,243 @@ async function loadKPIs(startDate, endDate) {
   }
 }
 
-async function loadMonthlyCharts(endDate) {
+async function loadMonthlyRevenueChart(endDate) {
   try {
     const data = await loadMonthlyPL(endDate);
     renderBarChart('chart-revenue', data.labels, data.income, 'Revenue', '#2e7d32');
-    renderLineChart('chart-trend', data.labels, data.income, data.cogs);
   } catch {
     renderBarChart('chart-revenue', ['No data'], [0], 'Revenue', '#2e7d32');
-    renderLineChart('chart-trend', [], [], []);
   }
-}
-
-async function loadRepChart(startDate, endDate) {
-  try {
-    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
-    const invoices = data?.Invoice || [];
-    const byClass = new Map();
-    let useClass = false;
-    for (const inv of invoices) {
-      const name = inv.ClassRef?.name;
-      if (name) {
-        useClass = true;
-        byClass.set(name, (byClass.get(name) || 0) + (Number(inv.TotalAmt) || 0));
-      }
-    }
-    let grouping = byClass;
-    if (!useClass) {
-      grouping = new Map();
-      for (const inv of invoices) {
-        const name = inv.CustomerRef?.name || 'Unknown';
-        grouping.set(name, (grouping.get(name) || 0) + (Number(inv.TotalAmt) || 0));
-      }
-    }
-    const sorted = [...grouping.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-    if (!sorted.length) {
-      renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#1976d2');
-    } else {
-      renderBarChart('chart-rep', sorted.map(e => e[0]), sorted.map(e => e[1]), useClass ? 'Sales by Class' : 'Sales by Customer', '#1976d2');
-    }
-  } catch {
-    renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#1976d2');
-  }
-}
-
-async function loadInvoices() {
-  try {
-    const data = await qbQuery(`SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 20`);
-    const invoices = (data?.Invoice || []).map(inv => ({
-      date: inv.TxnDate,
-      docNum: inv.DocNumber,
-      customer: inv.CustomerRef?.name || '?',
-      amount: inv.TotalAmt,
-      balance: inv.Balance,
-      status: inv.Balance > 0 ? 'open' : 'paid'
-    }));
-    renderInvoicesTable(invoices);
-  } catch { renderInvoicesTable([]); }
 }
 
 async function loadRepFilter() {
   try {
     const data = await qbQuery(`SELECT * FROM Class MAXRESULTS 50`);
     const repSelect = $('filter-rep');
+    const current = repSelect.value;
     repSelect.innerHTML = '<option value="">All</option>';
     (data?.Class || []).forEach(c => {
       const name = c.FullyQualifiedName || c.Name;
       if (name) repSelect.innerHTML += `<option value="${name}">${name}</option>`;
     });
+    if (current) repSelect.value = current;
   } catch {}
 }
+
+// Shared invoice + payment data pipeline
+
+async function loadAllInvoices(startDate, endDate) {
+  try {
+    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    return data?.Invoice || [];
+  } catch { return []; }
+}
+
+async function loadPaymentMap(startDate, endDate) {
+  const map = new Map();
+  try {
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    for (const p of data?.Payment || []) {
+      const method = p.PaymentMethodRef?.name || 'Unknown';
+      for (const line of p.Line || []) {
+        for (const linked of line.LinkedTxn || []) {
+          if (linked.TxnType === 'Invoice' && linked.TxnId) map.set(linked.TxnId, method);
+        }
+      }
+    }
+  } catch {}
+  return map;
+}
+
+function buildRows(rawInvoices, paymentMap, repFilter) {
+  const today = new Date();
+  return rawInvoices
+    .filter(inv => !repFilter || inv.ClassRef?.name === repFilter)
+    .map(inv => {
+      const balance = Number(inv.Balance) || 0;
+      const total = Number(inv.TotalAmt) || 0;
+      const status = balance <= 0 && total > 0 ? 'paid' : 'open';
+      const overdue = balance > 0 && inv.DueDate && new Date(inv.DueDate) < today;
+      return {
+        id: inv.Id,
+        date: inv.TxnDate,
+        docNum: inv.DocNumber,
+        customer: inv.CustomerRef?.name || null,
+        rep: inv.ClassRef?.name || null,
+        amount: total,
+        balance,
+        status: overdue ? 'overdue' : status,
+        paid: status === 'paid',
+        paymentMethod: paymentMap.get(inv.Id) || null,
+        dueDate: inv.DueDate || null,
+      };
+    });
+}
+
+// Renderers driven by shared invoice data
+
+function renderStatusBreakdown(rows) {
+  const paid = rows.filter(r => r.paid);
+  const open = rows.filter(r => !r.paid);
+  const paidTotal = paid.reduce((s, r) => s + r.amount, 0);
+  const openTotal = open.reduce((s, r) => s + r.balance, 0);
+  const total = rows.length;
+  const openPct = total ? (open.length / total) * 100 : 0;
+  const paidPct = total ? (paid.length / total) * 100 : 0;
+  $('status-open-amt').textContent = fmt(openTotal);
+  $('status-open-sub').textContent = `${open.length} invoice${open.length === 1 ? '' : 's'} · ${openPct.toFixed(1)}% of total`;
+  $('status-paid-amt').textContent = fmt(paidTotal);
+  $('status-paid-sub').textContent = `${paid.length} invoice${paid.length === 1 ? '' : 's'} · ${paidPct.toFixed(1)}% of total`;
+  renderMiniDonut('chart-status-open', open.length, paid.length, '#fb8c00');
+  renderMiniDonut('chart-status-paid', paid.length, open.length, '#4caf50');
+}
+
+function renderMiniDonut(canvasId, primary, secondary, color) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  const el = $(canvasId);
+  if (!el) return;
+  charts[canvasId] = new Chart(el, {
+    type: 'doughnut',
+    data: { datasets: [{ data: [primary, secondary], backgroundColor: [color, '#eceff1'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+  });
+}
+
+function renderRepChart(rows) {
+  const byRep = new Map();
+  for (const r of rows) {
+    const key = r.rep || 'Unassigned';
+    byRep.set(key, (byRep.get(key) || 0) + r.amount);
+  }
+  const sorted = [...byRep.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (!sorted.length) {
+    renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#1976d2');
+  } else {
+    renderBarChart('chart-rep', sorted.map(e => e[0]), sorted.map(e => e[1]), 'Sales by Rep', '#1976d2');
+  }
+}
+
+function renderLeaderboard(rows) {
+  const container = $('leaderboard');
+  const byRep = new Map();
+  for (const r of rows) {
+    const key = r.rep || 'Unassigned';
+    const agg = byRep.get(key) || { total: 0, count: 0, open: 0 };
+    agg.total += r.amount;
+    agg.count += 1;
+    if (!r.paid) agg.open += r.balance;
+    byRep.set(key, agg);
+  }
+  const sorted = [...byRep.entries()].sort((a, b) => b[1].total - a[1].total);
+  if (!sorted.length) {
+    container.innerHTML = '<div class="attention-empty">No sales in range.</div>';
+    return;
+  }
+  container.innerHTML = sorted.map(([name, agg], i) => `
+    <div class="leaderboard-row">
+      <div class="leaderboard-rank ${i < 3 ? 'top' : ''}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
+      <div>
+        <div class="leaderboard-name">${name}</div>
+        <div class="leaderboard-count">${agg.count} invoice${agg.count === 1 ? '' : 's'} · ${fmt(agg.open)} open</div>
+      </div>
+      <div class="leaderboard-amt">${fmt(agg.total)}</div>
+      <div></div>
+    </div>
+  `).join('');
+}
+
+function renderAttention(rows) {
+  const list = $('attention-list');
+  const today = new Date();
+  const flags = [];
+  for (const r of rows) {
+    const reasons = [];
+    if (!r.rep) reasons.push('Missing rep');
+    if (!r.customer) reasons.push('Missing customer');
+    if (!r.paid && r.dueDate && new Date(r.dueDate) < today) reasons.push('Overdue');
+    if (r.amount <= 0) reasons.push('Zero/negative total');
+    if (reasons.length) flags.push({ ...r, reasons });
+  }
+  flags.sort((a, b) => b.balance - a.balance);
+  $('attention-heading').innerHTML = `⚠️ Requires Attention <span style="font-size:.8rem;color:var(--text2);font-weight:500;">(${flags.length})</span>`;
+  if (!flags.length) {
+    list.innerHTML = '<div class="attention-empty">All clear — no flagged invoices in range.</div>';
+    return;
+  }
+  list.innerHTML = flags.slice(0, 50).map(f => {
+    const cls = f.reasons.includes('Overdue') ? 'overdue' : f.reasons.includes('Missing rep') ? 'missing-rep' : '';
+    return `
+      <div class="attention-item ${cls}">
+        <div class="attention-reason">${f.reasons.join(' · ')}</div>
+        <div><strong>${f.docNum || '—'}</strong> · ${f.customer || 'No customer'} · ${f.date || ''}</div>
+        <div style="font-weight:600;">${fmt(f.balance || f.amount)}</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPivot(rows) {
+  const dim = $('pivot-dim').value;
+  const tbody = $('pivot-tbody');
+  const header = $('pivot-dim-header');
+  const getKey = {
+    rep: r => r.rep || 'Unassigned',
+    customer: r => r.customer || 'Unknown',
+    payment: r => r.paymentMethod || 'Unpaid / Unknown',
+    month: r => r.date ? r.date.slice(0, 7) : 'Unknown',
+  }[dim];
+  header.textContent = { rep: 'Sales Rep', customer: 'Customer', payment: 'Payment Method', month: 'Month' }[dim];
+  const map = new Map();
+  for (const r of rows) {
+    const key = getKey(r);
+    const agg = map.get(key) || { total: 0, count: 0, open: 0 };
+    agg.total += r.amount;
+    agg.count += 1;
+    if (!r.paid) agg.open += r.balance;
+    map.set(key, agg);
+  }
+  const sorted = [...map.entries()].sort((a, b) => b[1].total - a[1].total);
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text2)">No data</td></tr>';
+    return;
+  }
+  tbody.innerHTML = sorted.map(([key, agg]) => `
+    <tr>
+      <td>${key}</td>
+      <td>${agg.count}</td>
+      <td>${fmt(agg.total)}</td>
+      <td>${fmt(agg.total / agg.count)}</td>
+      <td>${fmt(agg.open)}</td>
+    </tr>
+  `).join('');
+}
+
+// Date helpers + quick filter chips
+
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+function weekStart(d) { const s = new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay()); return s; }
+function weekEnd(d) { const s = weekStart(d); return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 6); }
+
+function quickRange(kind) {
+  const today = new Date();
+  if (kind === 'this-week') return [weekStart(today), weekEnd(today)];
+  if (kind === 'last-week') { const lw = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7); return [weekStart(lw), weekEnd(lw)]; }
+  if (kind === 'this-month') return [new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getFullYear(), today.getMonth() + 1, 0)];
+  if (kind === 'last-month') return [new Date(today.getFullYear(), today.getMonth() - 1, 1), new Date(today.getFullYear(), today.getMonth(), 0)];
+  if (kind === 'ytd') return [new Date(today.getFullYear(), 0, 1), today];
+  return [today, today];
+}
+
+function setQuickRange(kind) {
+  const [s, e] = quickRange(kind);
+  $('filter-start').value = ymd(s);
+  $('filter-end').value = ymd(e);
+  document.querySelectorAll('#chip-row .chip').forEach(c => c.classList.toggle('active', c.dataset.range === kind));
+  refreshDashboard();
+}
+
+// Cached rows for pivot dim changes without re-fetching
+let _lastRows = [];
 
 async function refreshDashboard() {
   clearError();
@@ -472,12 +801,28 @@ async function refreshDashboard() {
   const endDate = $('filter-end').value;
   if (!startDate || !endDate) return;
   $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
+
+  const repFilter = $('filter-rep').value || null;
+
+  const invoicesFetch = loadAllInvoices(startDate, endDate);
+  const paymentsFetch = loadPaymentMap(startDate, endDate);
+
   await Promise.all([
     loadKPIs(startDate, endDate),
-    loadMonthlyCharts(endDate),
-    loadRepChart(startDate, endDate),
-    loadInvoices(),
-    loadRepFilter()
+    loadMonthlyRevenueChart(endDate),
+    loadRepFilter(),
+    (async () => {
+      const [rawInvoices, paymentMap] = await Promise.all([invoicesFetch, paymentsFetch]);
+      const rows = buildRows(rawInvoices, paymentMap, repFilter);
+      _lastRows = rows;
+      renderStatusBreakdown(rows);
+      renderRepChart(rows);
+      renderLeaderboard(rows);
+      renderAttention(rows);
+      renderPivot(rows);
+      const recent = [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 50);
+      renderInvoicesTable(recent);
+    })(),
   ]);
 }
 
