@@ -334,25 +334,60 @@ function renderLineChart(canvasId, labels, rev, cogs) {
   });
 }
 
-// Data loaders
-async function loadKPIs(startDate, endDate) {
-  const revQ = `SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}'`;
-  try {
-    const revData = await qbQuery(revQ);
-    const revenue = revData?.[0]?.SUM?.TotalAmt || 0;
-    // Fallback: use P&L report
-    const pl = await apiFetch('/reports/ProfitAndLoss?start_date=' + startDate + '&end_date=' + endDate + '&summarize_column_by=Total');
-    const rows = pl?.Rows?.Row || [];
-    let cogs = 0;
-    for (const section of rows) {
-      const hdr = section.Header?.ColData?.[0]?.value || '';
-      if (hdr === 'Total Cost of Goods Sold') {
-        cogs = Math.abs(Number(section.Summary?.ColData?.[0]?.value)) || 0;
-      }
+// QBO's query language has no aggregates or GROUP BY — KPIs and
+// monthly rollups go through the Reports API; grouping charts
+// aggregate invoice rows client-side.
+
+function findPLSection(rows, labels) {
+  for (const r of rows) {
+    const label = r.Summary?.ColData?.[0]?.value;
+    if (label && labels.includes(label)) {
+      return r.Summary.ColData.slice(1).map(c => Number(c.value) || 0);
     }
-    const profit = revenue - cogs;
-    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-    $('kpi-revenue').textContent = fmt(revenue);
+    if (r.Rows?.Row) {
+      const nested = findPLSection(r.Rows.Row, labels);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function lastMonths(endDate, n) {
+  const [y, m] = endDate.split('-').map(Number);
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) {
+    const d = new Date(y, m - 1 - i, 1);
+    out.push({
+      start: d.toISOString().slice(0, 10),
+      end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10),
+      label: d.toLocaleString('en-US', { month: 'short', year: '2-digit' })
+    });
+  }
+  return out;
+}
+
+async function loadMonthlyPL(endDate) {
+  const months = lastMonths(endDate, 6);
+  const startDate = months[0].start;
+  const finalEnd = months[months.length - 1].end;
+  const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${finalEnd}&summarize_column_by=Month`);
+  const rows = pl?.Rows?.Row || [];
+  const income = (findPLSection(rows, ['Total Income']) || []).slice(0, months.length);
+  const cogs = (findPLSection(rows, ['Total Cost of Goods Sold']) || []).slice(0, months.length).map(Math.abs);
+  while (income.length < months.length) income.push(0);
+  while (cogs.length < months.length) cogs.push(0);
+  return { labels: months.map(m => m.label), income, cogs };
+}
+
+async function loadKPIs(startDate, endDate) {
+  try {
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Total`);
+    const rows = pl?.Rows?.Row || [];
+    const income = findPLSection(rows, ['Total Income'])?.[0] || 0;
+    const cogs = Math.abs(findPLSection(rows, ['Total Cost of Goods Sold'])?.[0] || 0);
+    const profit = income - cogs;
+    const margin = income > 0 ? (profit / income) * 100 : 0;
+    $('kpi-revenue').textContent = fmt(income);
     $('kpi-cogs').textContent = fmt(cogs);
     $('kpi-profit').textContent = fmt(profit);
     $('kpi-margin').textContent = pct(margin);
@@ -361,68 +396,56 @@ async function loadKPIs(startDate, endDate) {
   }
 }
 
-async function loadRevenueChart(endDate) {
-  const months = []; const labels = [];
-  const d = new Date(endDate.slice(0, 7) + '-01');
-  for (let i = 5; i >= 0; i--) {
-    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
-    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
-    labels.push(monthLabel(m));
+async function loadMonthlyCharts(endDate) {
+  try {
+    const data = await loadMonthlyPL(endDate);
+    renderBarChart('chart-revenue', data.labels, data.income, 'Revenue', '#2e7d32');
+    renderLineChart('chart-trend', data.labels, data.income, data.cogs);
+  } catch {
+    renderBarChart('chart-revenue', ['No data'], [0], 'Revenue', '#2e7d32');
+    renderLineChart('chart-trend', [], [], []);
   }
-  const values = [];
-  for (const p of months) {
-    try {
-      const data = await qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`);
-      values.push(Number(data?.[0]?.SUM?.TotalAmt || 0));
-    } catch { values.push(0); }
-  }
-  renderBarChart('chart-revenue', labels, values, 'Revenue', '#2e7d32');
 }
 
 async function loadRepChart(startDate, endDate) {
-  let labels = []; let values = [];
   try {
-    const data = await qbQuery(`SELECT ClassRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY ClassRef.fullName MAXRESULTS 10`);
-    const rows = data || [];
-    rows.forEach(r => { labels.push(r?.ClassRef?.fullName || r?.['ClassRef.fullName'] || 'Unknown'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
+    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    const invoices = data?.Invoice || [];
+    const byClass = new Map();
+    let useClass = false;
+    for (const inv of invoices) {
+      const name = inv.ClassRef?.name;
+      if (name) {
+        useClass = true;
+        byClass.set(name, (byClass.get(name) || 0) + (Number(inv.TotalAmt) || 0));
+      }
+    }
+    let grouping = byClass;
+    if (!useClass) {
+      grouping = new Map();
+      for (const inv of invoices) {
+        const name = inv.CustomerRef?.name || 'Unknown';
+        grouping.set(name, (grouping.get(name) || 0) + (Number(inv.TotalAmt) || 0));
+      }
+    }
+    const sorted = [...grouping.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+    if (!sorted.length) {
+      renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#1976d2');
+    } else {
+      renderBarChart('chart-rep', sorted.map(e => e[0]), sorted.map(e => e[1]), useClass ? 'Sales by Class' : 'Sales by Customer', '#1976d2');
+    }
   } catch {
-    try {
-      const data = await qbQuery(`SELECT CustomerRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY CustomerRef.fullName MAXRESULTS 8`);
-      (data || []).forEach(r => { labels.push(r?.CustomerRef?.fullName || r?.['CustomerRef.fullName'] || '?'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
-    } catch { labels = ['No data']; values = [0]; }
+    renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#1976d2');
   }
-  if (!labels.length) { labels = ['No data']; values = [0]; }
-  renderBarChart('chart-rep', labels, values, 'Sales', '#1976d2');
-}
-
-async function loadTrendChart(endDate) {
-  const months = []; const labels = [];
-  const d = new Date(endDate.slice(0, 7) + '-01');
-  for (let i = 5; i >= 0; i--) {
-    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
-    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
-    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
-    labels.push(monthLabel(m));
-  }
-  const revValues = []; const cogsValues = [];
-  for (const p of months) {
-    try {
-      const rev = await qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`);
-      revValues.push(Number(rev?.[0]?.SUM?.TotalAmt || 0));
-      cogsValues.push(revValues[revValues.length-1] * 0.48);
-    } catch { revValues.push(0); cogsValues.push(0); }
-  }
-  renderLineChart('chart-trend', labels, revValues, cogsValues);
 }
 
 async function loadInvoices() {
   try {
-    const data = await qbQuery(`SELECT DocNumber, TxnDate, TotalAmt, Balance, CustomerRef.Name FROM Invoice ORDER BY TxnDate DESC MAXRESULTS 20`);
-    const invoices = (data || []).map(inv => ({
+    const data = await qbQuery(`SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 20`);
+    const invoices = (data?.Invoice || []).map(inv => ({
       date: inv.TxnDate,
       docNum: inv.DocNumber,
-      customer: inv.CustomerRef?.Name || inv['CustomerRef.Name'] || '?',
+      customer: inv.CustomerRef?.name || '?',
       amount: inv.TotalAmt,
       balance: inv.Balance,
       status: inv.Balance > 0 ? 'open' : 'paid'
@@ -433,11 +456,11 @@ async function loadInvoices() {
 
 async function loadRepFilter() {
   try {
-    const data = await qbQuery(`SELECT ClassRef.fullName FROM Invoice GROUP BY ClassRef.fullName MAXRESULTS 20`);
+    const data = await qbQuery(`SELECT * FROM Class MAXRESULTS 50`);
     const repSelect = $('filter-rep');
     repSelect.innerHTML = '<option value="">All</option>';
-    (data || []).forEach(r => {
-      const name = r?.ClassRef?.fullName || r?.['ClassRef.fullName'];
+    (data?.Class || []).forEach(c => {
+      const name = c.FullyQualifiedName || c.Name;
       if (name) repSelect.innerHTML += `<option value="${name}">${name}</option>`;
     });
   } catch {}
@@ -451,9 +474,8 @@ async function refreshDashboard() {
   $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
   await Promise.all([
     loadKPIs(startDate, endDate),
-    loadRevenueChart(endDate),
+    loadMonthlyCharts(endDate),
     loadRepChart(startDate, endDate),
-    loadTrendChart(endDate),
     loadInvoices(),
     loadRepFilter()
   ]);
