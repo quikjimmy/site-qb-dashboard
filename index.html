@@ -363,7 +363,7 @@ async function loadKPIs(startDate, endDate) {
 
 async function loadRevenueChart(endDate) {
   const months = []; const labels = [];
-  const d = new Date(endDate + '-01');
+  const d = new Date(endDate.slice(0, 7) + '-01');
   for (let i = 5; i >= 0; i--) {
     const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
     const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
@@ -398,7 +398,7 @@ async function loadRepChart(startDate, endDate) {
 
 async function loadTrendChart(endDate) {
   const months = []; const labels = [];
-  const d = new Date(endDate + '-01');
+  const d = new Date(endDate.slice(0, 7) + '-01');
   for (let i = 5; i >= 0; i--) {
     const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
     const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
