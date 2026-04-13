@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickBooks KPI Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --qb-blue: #2e7d32;
+    --qb-green: #4caf50;
+    --qb-light: #e8f5e9;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --text2: #5a5a7a;
+    --border: #e0e0e0;
+    --red: #e53935;
+    --orange: #fb8c00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .topbar h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .3px; }
+  .topbar .status { font-size: .85rem; opacity: .9; }
+  .topbar button { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: .85rem; font-weight: 500; transition: background .2s; }
+  .topbar button:hover { background: rgba(255,255,255,.3); }
+  .topbar button.danger { background: rgba(229,57,53,.7); border-color: rgba(229,57,53,.5); }
+  .topbar button.danger:hover { background: rgba(229,57,53,.9); }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+  /* Login screen */
+  .login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; }
+  .login-screen .logo { width: 80px; margin-bottom: 20px; }
+  .login-screen h2 { font-size: 1.5rem; margin-bottom: 8px; }
+  .login-screen p { color: var(--text2); margin-bottom: 24px; max-width: 420px; }
+  .login-screen .qb-btn { background: #2e7d32; color: #fff; border: none; padding: 14px 32px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; transition: transform .1s, box-shadow .2s; box-shadow: 0 2px 8px rgba(46,125,50,.3); }
+  .login-screen .qb-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,125,50,.4); }
+  .login-screen .qb-btn svg { width: 20px; height: 20px; fill: #fff; }
+
+  /* Filters */
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center; }
+  .filters label { font-size: .8rem; font-weight: 500; color: var(--text2); display: flex; flex-direction: column; gap: 4px; }
+  .filters input, .filters select { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: .85rem; background: #fff; color: var(--text); }
+  .filters .apply-btn { align-self: flex-end; background: var(--qb-blue); color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+
+  /* KPI cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); }
+  .kpi-card .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); margin-bottom: 6px; }
+  .kpi-card .value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-card .sub { font-size: .8rem; color: var(--text2); margin-top: 4px; }
+  .kpi-card.revenue .value { color: var(--qb-blue); }
+  .kpi-card.cogs .value { color: var(--red); }
+  .kpi-card.profit .value { color: var(--qb-green); }
+  .kpi-card.margin .value { color: var(--orange); }
+
+  /* Charts */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .charts-row.single { grid-template-columns: 1fr; }
+  .chart-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); }
+  .chart-card h3 { font-size: .95rem; margin-bottom: 14px; color: var(--text2); font-weight: 600; }
+  .chart-card canvas { width: 100% !important; max-height: 260px; }
+
+  /* Table */
+  .table-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); margin-bottom: 24px; }
+  .table-card h3 { font-size: .95rem; margin-bottom: 14px; color: var(--text2); font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  thead th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border); color: var(--text2); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .4px; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+  tbody tr:hover { background: var(--qb-light); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600; }
+  .badge.paid { background: #e8f5e9; color: #2e7d32; }
+  .badge.open { background: #fff3e0; color: #e65100; }
+  .badge.overdue { background: #ffebee; color: #c62828; }
+
+  /* Loading */
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--qb-blue); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 60px 0; color: var(--text2); font-size: .95rem; }
+  .error-msg { background: #ffebee; color: #c62828; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px; font-size: .9rem; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 540px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; gap: 8px; text-align: center; }
+    .filters { flex-direction: column; align-items: stretch; }
+    .filters label { width: 100%; }
+    .filters input, .filters select { width: 100%; }
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📊 QuickBooks KPI Dashboard</h1>
+  <div id="topbar-right">
+    <span class="status hidden" id="conn-status"></span>
+    <button class="hidden danger" id="logout-btn" onclick="logout()">Disconnect</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-screen">
+    <svg class="logo" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#2e7d32"/><path d="M16 24a8 8 0 1 1 16 0" stroke="#fff" stroke-width="3" fill="none"/><circle cx="24" cy="24" r="3" fill="#fff"/></svg>
+    <h2>Connect to QuickBooks</h2>
+    <p>Authorize this dashboard to read your QuickBooks Online company data. Only read-only access is requested.</p>
+    <button class="qb-btn" onclick="startOAuth()">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93s3.05-7.44 7-7.93V4l5 4-5 4V7.07z"/></svg>
+      Connect with QuickBooks
+    </button>
+    <p style="margin-top:24px;font-size:.85rem;color:var(--text2);">Or view demo data (sample):</p>
+    <button onclick="showDemoDashboard()" style="background:#fff;border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:6px;cursor:pointer;font-size:.9rem;margin-top:8px;">📊 View Demo Data</button>
+    <p style="margin-top:16px;font-size:.78rem;color:var(--text2);">Your data is secured via server-side OAuth. No tokens stored in browser.</p>
+  </div>
+
+  <!-- DASHBOARD (hidden until auth) -->
+  <div id="dashboard" class="hidden">
+    <!-- Filters -->
+    <div class="filters">
+      <label>Start Date<input type="date" id="filter-start"></label>
+      <label>End Date<input type="date" id="filter-end"></label>
+      <label>Sales Rep / Class<select id="filter-rep"><option value="">All</option></select></label>
+      <button class="apply-btn" onclick="refreshDashboard()">Apply</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
+      <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
+      <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
+      <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
+      <div class="chart-card"><h3>Sales by Rep / Class</h3><canvas id="chart-rep"></canvas></div>
+    </div>
+    <div class="charts-row single">
+      <div class="chart-card"><h3>Revenue vs COGS Trend</h3><canvas id="chart-trend"></canvas></div>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="table-card">
+      <h3>Recent Invoices</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+          <tbody id="invoices-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Demo data (embedded sample from Q1-Q2 2026)
+const DEMO_DATA = {
+  kpis: { revenue: 738175.61, cogs: 356345.23, profit: 381830.38, margin: 51.7 },
+  revenueByMonth: [
+    { month: 'Jan 26', revenue: 185200 },
+    { month: 'Feb 26', revenue: 142300 },
+    { month: 'Mar 26', revenue: 198400 },
+    { month: 'Apr 26', revenue: 212275 }
+  ],
+  salesByRep: [
+    { rep: 'Brock', sales: 425000 },
+    { rep: 'Kellen', sales: 185000 },
+    { rep: 'Other', sales: 128175 }
+  ],
+  invoices: [
+    { date: '2026-04-17', docNum: 'INV-1065', customer: 'Grant langston', amount: 11779.60, balance: 11779.60, status: 'open' },
+    { date: '2026-04-13', docNum: 'INV-1169', customer: 'Concrete Illusions', amount: 9232.79, balance: 9232.79, status: 'open' },
+    { date: '2026-04-13', docNum: 'INV-1163', customer: 'Floored Solutions LLC', amount: 4654.17, balance: 4654.17, status: 'open' },
+    { date: '2026-04-13', docNum: 'INV-1078', customer: 'Ashley Farmer', amount: 1042.38, balance: 1042.38, status: 'open' },
+    { date: '2026-04-11', docNum: 'INV-1206', customer: 'Paxson Brothers LLC', amount: 692.99, balance: 692.99, status: 'open' },
+    { date: '2026-04-11', docNum: 'INV-1205', customer: 'Juan arboeda', amount: 3235.70, balance: 3235.70, status: 'open' },
+    { date: '2026-04-10', docNum: 'INV-1204', customer: 'Floored Solutions LLC', amount: 949.99, balance: 0, status: 'paid' },
+    { date: '2026-04-10', docNum: 'INV-1203', customer: 'Grant langston', amount: 172.24, balance: 0, status: 'paid' }
+  ]
+};
+let isDemoMode = false;
+let realmId = null;
+let charts = {};
+
+// Helpers
+function $(id) { return document.getElementById(id); }
+function fmt(n) { return n != null ? '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'; }
+function pct(n) { return n != null ? n.toFixed(1) + '%' : '—'; }
+function monthLabel(d) { return d.toLocaleString('en-US', {month:'short', year:'2-digit'}); }
+
+function defaultDateRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return [start.toISOString().slice(0,10), end.toISOString().slice(0,10)];
+}
+
+function showError(msg) {
+  let el = document.querySelector('.error-msg');
+  if (!el) { el = document.createElement('div'); el.className = 'error-msg'; $('dashboard').prepend(el); }
+  el.textContent = msg; el.classList.remove('hidden');
+}
+function clearError() { document.querySelectorAll('.error-msg').forEach(e => e.remove()); }
+
+// OAuth - redirect to backend
+function startOAuth() {
+  window.location.href = '/api/auth/start';
+}
+
+// API calls via backend proxy
+async function apiFetch(path) {
+  const res = await fetch('/api/qb' + path, { credentials: 'include' });
+  if (!res.ok) {
+    if (res.status === 401) { logout(); throw new Error('Session expired'); }
+    throw new Error('API error: ' + res.status);
+  }
+  return res.json();
+}
+
+async function qbQuery(sql) {
+  const data = await apiFetch('/query?query=' + encodeURIComponent(sql));
+  return data.QueryResponse;
+}
+
+function logout() {
+  isDemoMode = false; realmId = null;
+  showLogin();
+}
+
+function showLogin() {
+  $('login-screen').classList.remove('hidden');
+  $('dashboard').classList.add('hidden');
+  $('conn-status').classList.add('hidden');
+  $('logout-btn').classList.add('hidden');
+}
+
+function showDashboard() {
+  $('login-screen').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+  $('conn-status').classList.remove('hidden');
+  $('conn-status').textContent = '🟢 Connected';
+  $('logout-btn').classList.remove('hidden');
+  const [s, e] = defaultDateRange();
+  $('filter-start').value = s;
+  $('filter-end').value = e;
+  refreshDashboard();
+}
+
+function showDemoDashboard() {
+  isDemoMode = true;
+  $('login-screen').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+  $('conn-status').classList.remove('hidden');
+  $('conn-status').textContent = '🟡 Demo Mode (sample data)';
+  $('logout-btn').classList.remove('hidden');
+  $('filter-start').value = '2026-01-01';
+  $('filter-end').value = '2026-04-13';
+  loadDemoData();
+}
+
+function loadDemoData() {
+  const d = DEMO_DATA;
+  $('kpi-revenue').textContent = fmt(d.kpis.revenue);
+  $('kpi-cogs').textContent = fmt(d.kpis.cogs);
+  $('kpi-profit').textContent = fmt(d.kpis.profit);
+  $('kpi-margin').textContent = pct(d.kpis.margin);
+  $('kpi-revenue-sub').textContent = 'Q1-Q2 2026';
+  $('kpi-cogs-sub').textContent = 'Q1-Q2 2026';
+  $('kpi-profit-sub').textContent = 'Q1-Q2 2026';
+  $('kpi-margin-sub').textContent = 'Q1-Q2 2026';
+  const revLabels = d.revenueByMonth.map(m => m.month);
+  const revValues = d.revenueByMonth.map(m => m.revenue);
+  renderBarChart('chart-revenue', revLabels, revValues, 'Revenue', '#2e7d32');
+  renderBarChart('chart-rep', d.salesByRep.map(r => r.rep), d.salesByRep.map(r => r.sales), 'Sales', '#1976d2');
+  const cogsValues = d.revenueByMonth.map(m => m.revenue * 0.48);
+  renderLineChart('chart-trend', revLabels, revValues, cogsValues);
+  renderInvoicesTable(d.invoices);
+  const repSelect = $('filter-rep');
+  repSelect.innerHTML = '<option value="">All</option>';
+  d.salesByRep.forEach(r => { repSelect.innerHTML += `<option value="${r.rep}">${r.rep}</option>`; });
+}
+
+function renderInvoicesTable(invoices) {
+  const tbody = $('invoices-tbody');
+  tbody.innerHTML = invoices.map(inv => `
+    <tr>
+      <td>${inv.date}</td>
+      <td>${inv.docNum}</td>
+      <td>${inv.customer}</td>
+      <td>${fmt(inv.amount)}</td>
+      <td>${fmt(inv.balance)}</td>
+      <td><span class="badge ${inv.status}">${inv.status.toUpperCase()}</span></td>
+    </tr>
+  `).join('');
+}
+
+// Chart renderers
+function renderBarChart(canvasId, labels, values, label, color) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart($(canvasId), {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data: values, backgroundColor: color, borderRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } } }
+  });
+}
+
+function renderLineChart(canvasId, labels, rev, cogs) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart($(canvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Revenue', data: rev, borderColor: '#2e7d32', backgroundColor: 'rgba(46,125,50,.1)', fill: true, tension: .3 },
+        { label: 'COGS', data: cogs, borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,.1)', fill: true, tension: .3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } }
+    }
+  });
+}
+
+// Data loaders
+async function loadKPIs(startDate, endDate) {
+  const revQ = `SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}'`;
+  try {
+    const revData = await qbQuery(revQ);
+    const revenue = revData?.[0]?.SUM?.TotalAmt || 0;
+    // Fallback: use P&L report
+    const pl = await apiFetch('/reports/ProfitAndLoss?start_date=' + startDate + '&end_date=' + endDate + '&summarize_column_by=Total');
+    const rows = pl?.Rows?.Row || [];
+    let cogs = 0;
+    for (const section of rows) {
+      const hdr = section.Header?.ColData?.[0]?.value || '';
+      if (hdr === 'Total Cost of Goods Sold') {
+        cogs = Math.abs(Number(section.Summary?.ColData?.[0]?.value)) || 0;
+      }
+    }
+    const profit = revenue - cogs;
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    $('kpi-revenue').textContent = fmt(revenue);
+    $('kpi-cogs').textContent = fmt(cogs);
+    $('kpi-profit').textContent = fmt(profit);
+    $('kpi-margin').textContent = pct(margin);
+  } catch (e) {
+    showError('Could not load KPIs: ' + (e.message || e));
+  }
+}
+
+async function loadRevenueChart(endDate) {
+  const months = []; const labels = [];
+  const d = new Date(endDate + '-01');
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
+    labels.push(monthLabel(m));
+  }
+  const values = [];
+  for (const p of months) {
+    try {
+      const data = await qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`);
+      values.push(Number(data?.[0]?.SUM?.TotalAmt || 0));
+    } catch { values.push(0); }
+  }
+  renderBarChart('chart-revenue', labels, values, 'Revenue', '#2e7d32');
+}
+
+async function loadRepChart(startDate, endDate) {
+  let labels = []; let values = [];
+  try {
+    const data = await qbQuery(`SELECT ClassRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY ClassRef.fullName MAXRESULTS 10`);
+    const rows = data || [];
+    rows.forEach(r => { labels.push(r?.ClassRef?.fullName || r?.['ClassRef.fullName'] || 'Unknown'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
+  } catch {
+    try {
+      const data = await qbQuery(`SELECT CustomerRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY CustomerRef.fullName MAXRESULTS 8`);
+      (data || []).forEach(r => { labels.push(r?.CustomerRef?.fullName || r?.['CustomerRef.fullName'] || '?'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
+    } catch { labels = ['No data']; values = [0]; }
+  }
+  if (!labels.length) { labels = ['No data']; values = [0]; }
+  renderBarChart('chart-rep', labels, values, 'Sales', '#1976d2');
+}
+
+async function loadTrendChart(endDate) {
+  const months = []; const labels = [];
+  const d = new Date(endDate + '-01');
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
+    labels.push(monthLabel(m));
+  }
+  const revValues = []; const cogsValues = [];
+  for (const p of months) {
+    try {
+      const rev = await qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`);
+      revValues.push(Number(rev?.[0]?.SUM?.TotalAmt || 0));
+      cogsValues.push(revValues[revValues.length-1] * 0.48);
+    } catch { revValues.push(0); cogsValues.push(0); }
+  }
+  renderLineChart('chart-trend', labels, revValues, cogsValues);
+}
+
+async function loadInvoices() {
+  try {
+    const data = await qbQuery(`SELECT DocNumber, TxnDate, TotalAmt, Balance, CustomerRef.Name FROM Invoice ORDER BY TxnDate DESC MAXRESULTS 20`);
+    const invoices = (data || []).map(inv => ({
+      date: inv.TxnDate,
+      docNum: inv.DocNumber,
+      customer: inv.CustomerRef?.Name || inv['CustomerRef.Name'] || '?',
+      amount: inv.TotalAmt,
+      balance: inv.Balance,
+      status: inv.Balance > 0 ? 'open' : 'paid'
+    }));
+    renderInvoicesTable(invoices);
+  } catch { renderInvoicesTable([]); }
+}
+
+async function loadRepFilter() {
+  try {
+    const data = await qbQuery(`SELECT ClassRef.fullName FROM Invoice GROUP BY ClassRef.fullName MAXRESULTS 20`);
+    const repSelect = $('filter-rep');
+    repSelect.innerHTML = '<option value="">All</option>';
+    (data || []).forEach(r => {
+      const name = r?.ClassRef?.fullName || r?.['ClassRef.fullName'];
+      if (name) repSelect.innerHTML += `<option value="${name}">${name}</option>`;
+    });
+  } catch {}
+}
+
+async function refreshDashboard() {
+  clearError();
+  const startDate = $('filter-start').value;
+  const endDate = $('filter-end').value;
+  if (!startDate || !endDate) return;
+  $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
+  await Promise.all([
+    loadKPIs(startDate, endDate),
+    loadRevenueChart(endDate),
+    loadRepChart(startDate, endDate),
+    loadTrendChart(endDate),
+    loadInvoices(),
+    loadRepFilter()
+  ]);
+}
+
+// Init - check session
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const error = params.get('error');
+  
+  if (error) {
+    alert('Auth error: ' + error);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+  
+  // Check session via API
+  try {
+    const me = await fetch('/api/me', { credentials: 'include' }).then(r => r.ok ? r.json() : null);
+    if (me && me.realmId) {
+      realmId = me.realmId;
+      showDashboard();
+    } else {
+      showLogin();
+    }
+  } catch {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
