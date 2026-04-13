@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QuickBooks KPI Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --qb-blue: #2e7d32;
+    --qb-green: #4caf50;
+    --qb-light: #e8f5e9;
+    --bg: #f4f6f8;
+    --card: #ffffff;
+    --text: #1a1a2e;
+    --text2: #5a5a7a;
+    --border: #e0e0e0;
+    --red: #e53935;
+    --orange: #fb8c00;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  .topbar { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
+  .topbar h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .3px; }
+  .topbar .status { font-size: .85rem; opacity: .9; }
+  .topbar button { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: .85rem; font-weight: 500; transition: background .2s; }
+  .topbar button:hover { background: rgba(255,255,255,.3); }
+  .topbar button.danger { background: rgba(229,57,53,.7); border-color: rgba(229,57,53,.5); }
+  .topbar button.danger:hover { background: rgba(229,57,53,.9); }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 20px; }
+
+  /* Login screen */
+  .login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; }
+  .login-screen .logo { width: 80px; margin-bottom: 20px; }
+  .login-screen h2 { font-size: 1.5rem; margin-bottom: 8px; }
+  .login-screen p { color: var(--text2); margin-bottom: 24px; max-width: 420px; }
+  .login-screen .qb-btn { background: #2e7d32; color: #fff; border: none; padding: 14px 32px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; transition: transform .1s, box-shadow .2s; box-shadow: 0 2px 8px rgba(46,125,50,.3); }
+  .login-screen .qb-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(46,125,50,.4); }
+  .login-screen .qb-btn svg { width: 20px; height: 20px; fill: #fff; }
+
+  /* Filters */
+  .filters { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; align-items: center; }
+  .filters label { font-size: .8rem; font-weight: 500; color: var(--text2); display: flex; flex-direction: column; gap: 4px; }
+  .filters input, .filters select { border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: .85rem; background: #fff; color: var(--text); }
+  .filters .apply-btn { align-self: flex-end; background: var(--qb-blue); color: #fff; border: none; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 500; }
+
+  /* KPI cards */
+  .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .kpi-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); }
+  .kpi-card .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); margin-bottom: 6px; }
+  .kpi-card .value { font-size: 1.75rem; font-weight: 700; }
+  .kpi-card .sub { font-size: .8rem; color: var(--text2); margin-top: 4px; }
+  .kpi-card.revenue .value { color: var(--qb-blue); }
+  .kpi-card.cogs .value { color: var(--red); }
+  .kpi-card.profit .value { color: var(--qb-green); }
+  .kpi-card.margin .value { color: var(--orange); }
+
+  /* Charts */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  .charts-row.single { grid-template-columns: 1fr; }
+  .chart-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); }
+  .chart-card h3 { font-size: .95rem; margin-bottom: 14px; color: var(--text2); font-weight: 600; }
+  .chart-card canvas { width: 100% !important; max-height: 260px; }
+
+  /* Table */
+  .table-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); border: 1px solid var(--border); margin-bottom: 24px; }
+  .table-card h3 { font-size: .95rem; margin-bottom: 14px; color: var(--text2); font-weight: 600; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  thead th { text-align: left; padding: 10px 12px; border-bottom: 2px solid var(--border); color: var(--text2); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .4px; }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
+  tbody tr:hover { background: var(--qb-light); }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600; }
+  .badge.paid { background: #e8f5e9; color: #2e7d32; }
+  .badge.open { background: #fff3e0; color: #e65100; }
+  .badge.overdue { background: #ffebee; color: #c62828; }
+
+  /* Loading */
+  .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--qb-blue); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-overlay { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 60px 0; color: var(--text2); font-size: .95rem; }
+  .error-msg { background: #ffebee; color: #c62828; padding: 16px 20px; border-radius: 8px; margin-bottom: 20px; font-size: .9rem; }
+
+  /* Responsive */
+  @media (max-width: 900px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .charts-row { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 540px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+    .topbar { flex-direction: column; gap: 8px; text-align: center; }
+    .filters { flex-direction: column; align-items: stretch; }
+    .filters label { width: 100%; }
+    .filters input, .filters select { width: 100%; }
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>📊 QuickBooks KPI Dashboard</h1>
+  <div id="topbar-right">
+    <span class="status hidden" id="conn-status"></span>
+    <button class="hidden danger" id="logout-btn" onclick="logout()">Disconnect</button>
+  </div>
+</div>
+
+<div class="container">
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen" class="login-screen">
+    <svg class="logo" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#2e7d32"/><path d="M16 24a8 8 0 1 1 16 0" stroke="#fff" stroke-width="3" fill="none"/><circle cx="24" cy="24" r="3" fill="#fff"/></svg>
+    <h2>Connect to QuickBooks</h2>
+    <p>Authorize this dashboard to read your QuickBooks Online company data. Only read-only access is requested.</p>
+    <button class="qb-btn" onclick="startOAuth()">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93s3.05-7.44 7-7.93V4l5 4-5 4V7.07z"/></svg>
+      Connect with QuickBooks
+    </button>
+    <p style="margin-top:16px;font-size:.78rem;color:var(--text2);">Configure your <strong>Redirect URI</strong> in the Intuit Developer Portal to match this page's URL.</p>
+  </div>
+
+  <!-- DASHBOARD (hidden until auth) -->
+  <div id="dashboard" class="hidden">
+    <!-- Filters -->
+    <div class="filters">
+      <label>Start Date<input type="date" id="filter-start"></label>
+      <label>End Date<input type="date" id="filter-end"></label>
+      <label>Sales Rep / Class<select id="filter-rep"><option value="">All</option></select></label>
+      <button class="apply-btn" onclick="refreshDashboard()">Apply</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
+      <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
+      <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
+      <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
+      <div class="chart-card"><h3>Sales by Rep / Class</h3><canvas id="chart-rep"></canvas></div>
+    </div>
+    <div class="charts-row single">
+      <div class="chart-card"><h3>Revenue vs COGS Trend</h3><canvas id="chart-trend"></canvas></div>
+    </div>
+
+    <!-- Invoices Table -->
+    <div class="table-card">
+      <h3>Recent Invoices</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+          <tbody id="invoices-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───
+const CLIENT_ID = 'ABe6ocRw3PPrmyMyQ3kMFGcDPETjat2022TVrysCHVZvTJ0xt2';
+const SCOPE = 'com.intuit.quickbooks.accounting';
+const BASE_ENV = 'https://appcenter.intuit.com/connect/oauth2';
+const TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
+const QB_BASE = 'https://quickbooks.api.intuit.com/v3/company/';
+
+// ─── STATE ───
+let tokens = JSON.parse(localStorage.getItem('qb_tokens') || 'null');
+let realmId = localStorage.getItem('qb_realmId');
+let charts = {};
+
+// ─── HELPERS ───
+function $(id) { return document.getElementById(id); }
+function fmt(n) { return n != null ? '$' + Number(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}) : '—'; }
+function pct(n) { return n != null ? n.toFixed(1) + '%' : '—'; }
+function monthLabel(d) { return d.toLocaleString('en-US', {month:'short', year:'2-digit'}); }
+
+function defaultDateRange() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return [start.toISOString().slice(0,10), end.toISOString().slice(0,10)];
+}
+
+function showError(msg) {
+  let el = document.querySelector('.error-msg');
+  if (!el) { el = document.createElement('div'); el.className = 'error-msg'; $('dashboard').prepend(el); }
+  el.textContent = msg; el.classList.remove('hidden');
+}
+function clearError() { document.querySelectorAll('.error-msg').forEach(e => e.remove()); }
+
+// ─── OAUTH ───
+function startOAuth() {
+  const redirectUri = window.location.origin + window.location.pathname;
+  localStorage.setItem('qb_redirect_uri', redirectUri);
+  const url = `${BASE_ENV}?client_id=${CLIENT_ID}&scope=${SCOPE}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&state=${Date.now()}`;
+  window.location.href = url;
+}
+
+async function exchangeCode(code) {
+  const redirectUri = localStorage.getItem('qb_redirect_uri') || window.location.origin + window.location.pathname;
+  const creds = btoa(CLIENT_ID + ':');
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Basic ' + creds },
+    body: `grant_type=authorization_code&code=${code}&redirect_uri=${encodeURIComponent(redirectUri)}`
+  });
+  if (!res.ok) { const t = await res.text(); throw new Error('Token exchange failed: ' + t); }
+  const data = await res.json();
+  tokens = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 };
+  if (data.realmId) { realmId = data.realmId; localStorage.setItem('qb_realmId', realmId); }
+  localStorage.setItem('qb_tokens', JSON.stringify(tokens));
+  // Clean URL
+  window.history.replaceState({}, document.title, window.location.pathname);
+}
+
+async function refreshAccessToken() {
+  if (!tokens || !tokens.refresh_token) return false;
+  const creds = btoa(CLIENT_ID + ':');
+  const res = await fetch(TOKEN_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Authorization': 'Basic ' + creds },
+    body: `grant_type=refresh_token&refresh_token=${tokens.refresh_token}`
+  });
+  if (!res.ok) { logout(); return false; }
+  const data = await res.json();
+  tokens = { access_token: data.access_token, refresh_token: data.refresh_token, expires_at: Date.now() + data.expires_in * 1000 };
+  localStorage.setItem('qb_tokens', JSON.stringify(tokens));
+  return true;
+}
+
+async function qbFetch(path) {
+  if (!tokens || !realmId) throw new Error('Not authenticated');
+  if (Date.now() > tokens.expires_at - 60000) { await refreshAccessToken(); }
+  const res = await fetch(QB_BASE + realmId + path, {
+    headers: { 'Authorization': 'Bearer ' + tokens.access_token, 'Accept': 'application/json' }
+  });
+  if (res.status === 401) { const ok = await refreshAccessToken(); if (ok) return qbFetch(path); logout(); throw new Error('Session expired'); }
+  if (!res.ok) throw new Error('QB API error ' + res.status + ': ' + await res.text());
+  return res.json();
+}
+
+async function qbQuery(sql) {
+  const data = await qbFetch('/query?query=' + encodeURIComponent(sql));
+  return data.QueryResponse;
+}
+
+function logout() {
+  tokens = null; realmId = null;
+  localStorage.removeItem('qb_tokens'); localStorage.removeItem('qb_realmId');
+  showLogin();
+}
+
+function showLogin() {
+  $('login-screen').classList.remove('hidden');
+  $('dashboard').classList.add('hidden');
+  $('conn-status').classList.add('hidden');
+  $('logout-btn').classList.add('hidden');
+}
+
+function showDashboard() {
+  $('login-screen').classList.add('hidden');
+  $('dashboard').classList.remove('hidden');
+  $('conn-status').classList.remove('hidden');
+  $('conn-status').textContent = '🟢 Connected — Realm ' + realmId;
+  $('logout-btn').classList.remove('hidden');
+  const [s, e] = defaultDateRange();
+  $('filter-start').value = s;
+  $('filter-end').value = e;
+  refreshDashboard();
+}
+
+// ─── DATA LOADERS ───
+async function loadKPIs(startDate, endDate) {
+  const revQ = `SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}'`;
+  const cogsQ = `SELECT SUM(TotalAmt) FROM Purchase WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' AND AccountFromEnum = 'CostOfGoodsSold'`;
+  // Fallback: use P&L approach via reports if query fails
+  try {
+    const [revData, cogsData] = await Promise.all([qbQuery(revQ), qbQuery(cogsQ)]);
+    const revenue = revData?.[0]?.SUM?.TotalAmt || 0;
+    const cogs = cogsData?.[0]?.SUM?.TotalAmt || 0;
+    const profit = revenue - cogs;
+    const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+    $('kpi-revenue').textContent = fmt(revenue);
+    $('kpi-cogs').textContent = fmt(cogs);
+    $('kpi-profit').textContent = fmt(profit);
+    $('kpi-margin').textContent = pct(margin);
+  } catch (e) {
+    // Fallback: try P&L report endpoint
+    try {
+      const pl = await qbFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Total`);
+      const rows = pl?.Rows?.Row || [];
+      let revenue = 0, cogs = 0;
+      function findSection(rows, type) {
+        for (const r of rows) {
+          if (r.Header?.ColData?.[1]?.value === type || r.Header?.ColData?.[0]?.value === type) return r;
+          if (r.Rows?.Row) { const f = findSection(r.Rows.Row, type); if (f) return f; }
+        }
+        return null;
+      }
+      function getVal(rows, label) {
+        for (const r of rows) {
+          if (r.ColData) {
+            for (const c of r.ColData) { if (c.value === label && r.Summary?.ColData?.[0]?.value != null) return Number(r.Summary.ColData[0].value); }
+          }
+          if (r.Header?.ColData?.[0]?.value === label && r.Summary?.ColData?.[0]) return Number(r.Summary.ColData[0].value);
+          if (r.Rows?.Row) { const v = getVal(r.Rows.Row, label); if (v) return v; }
+        }
+        return 0;
+      }
+      // Walk P&L structure
+      for (const section of rows) {
+        const hdr = section.Header?.ColData?.[0]?.value || '';
+        const summary = section.Summary?.ColData?.[0]?.value;
+        if (hdr === 'Total Income' || hdr === 'Income') revenue = Number(summary) || revenue;
+        if (hdr === 'Cost of Goods Sold' || hdr === 'Total Cost of Goods Sold') cogs = Math.abs(Number(summary)) || cogs;
+      }
+      const profit = revenue - cogs;
+      const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
+      $('kpi-revenue').textContent = fmt(revenue);
+      $('kpi-cogs').textContent = fmt(cogs);
+      $('kpi-profit').textContent = fmt(profit);
+      $('kpi-margin').textContent = pct(margin);
+    } catch (e2) {
+      showError('Could not load KPIs: ' + (e2.message || e2));
+    }
+  }
+}
+
+async function loadRevenueChart(endDate) {
+  const months = []; const labels = [];
+  const d = new Date(endDate + '-01');
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
+    labels.push(monthLabel(m));
+  }
+  const values = [];
+  for (const p of months) {
+    try {
+      const data = await qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`);
+      values.push(Number(data?.[0]?.SUM?.TotalAmt || 0));
+    } catch { values.push(0); }
+  }
+  renderBarChart('chart-revenue', labels, values, 'Revenue', '#2e7d32');
+}
+
+async function loadRepChart(startDate, endDate) {
+  try {
+    const data = await qbQuery(`SELECT SalesTermRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY SalesTermRef.fullName MAXRESULTS 20`);
+    // Alternative: try by Class
+  } catch {}
+  // Fallback: try by class
+  let labels = []; let values = [];
+  try {
+    const data = await qbQuery(`SELECT ClassRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY ClassRef.fullName MAXRESULTS 10`);
+    const rows = data || [];
+    rows.forEach(r => { labels.push(r?.ClassRef?.fullName || r?.['ClassRef.fullName'] || 'Unknown'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
+  } catch {
+    // Try sales by customer as last resort
+    try {
+      const data = await qbQuery(`SELECT CustomerRef.fullName, SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' GROUP BY CustomerRef.fullName MAXRESULTS 8`);
+      (data || []).forEach(r => { labels.push(r?.CustomerRef?.fullName || r?.['CustomerRef.fullName'] || '?'); values.push(Number(r?.SUM?.TotalAmt || 0)); });
+    } catch { labels = ['No data']; values = [0]; }
+  }
+  if (!labels.length) { labels = ['No data']; values = [0]; }
+  renderBarChart('chart-rep', labels, values, 'Sales', '#1976d2');
+}
+
+async function loadTrendChart(endDate) {
+  const months = []; const labels = [];
+  const d = new Date(endDate + '-01');
+  for (let i = 5; i >= 0; i--) {
+    const m = new Date(d.getFullYear(), d.getMonth() - i, 1);
+    const end = new Date(m.getFullYear(), m.getMonth() + 1, 0);
+    months.push({ start: m.toISOString().slice(0,10), end: end.toISOString().slice(0,10) });
+    labels.push(monthLabel(m));
+  }
+  const revValues = []; const cogsValues = [];
+  for (const p of months) {
+    try {
+      const [rev, cogs] = await Promise.all([
+        qbQuery(`SELECT SUM(TotalAmt) FROM Invoice WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}'`),
+        qbQuery(`SELECT SUM(TotalAmt) FROM Purchase WHERE TxnDate >= '${p.start}' AND TxnDate <= '${p.end}' AND AccountFromEnum = 'CostOfGoodsSold'`)
+      ]);
+      revValues.push(Number(rev?.[0]?.SUM?.TotalAmt || 0));
+      cogsValues.push(Number(cogs?.[0]?.SUM?.TotalAmt || 0));
+    } catch { revValues.push(0); cogsValues.push(0); }
+  }
+  renderLineChart('chart-trend', labels, revValues, cogsValues);
+}
+
+async function loadInvoices() {
+  const tbody = $('invoices-tbody');
+  tbody.innerHTML = '<tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading invoices…</td></tr>';
+  try {
+    const data = await qbQuery('SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 20');
+    const invoices = data || [];
+    if (!invoices.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No invoices found</td></tr>'; return; }
+    tbody.innerHTML = invoices.map(inv => {
+      const date = inv.TxnDate || '—';
+      const num = inv.DocNumber || '—';
+      const cust = inv.CustomerRef?.name || inv.CustomerRef?.fullName || '—';
+      const amt = fmt(inv.TotalAmt);
+      const bal = fmt(inv.Balance);
+      let status = 'open', badge = 'badge open';
+      if (inv.Balance <= 0) { status = 'Paid'; badge = 'badge paid'; }
+      else if (inv.DueDate && new Date(inv.DueDate) < new Date()) { status = 'Overdue'; badge = 'badge overdue'; }
+      return `<tr><td>${date}</td><td>${num}</td><td>${cust}</td><td>${amt}</td><td>${bal}</td><td><span class="${badge}">${status}</span></td></tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--red);padding:16px">Error: ${e.message}</td></tr>`;
+  }
+}
+
+async function loadRepFilter() {
+  const sel = $('filter-rep');
+  sel.innerHTML = '<option value="">All</option>';
+  try {
+    const data = await qbQuery('SELECT * FROM Class MAXRESULTS 50');
+    (data || []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.Name || c.Id;
+      opt.textContent = c.Name || c.Id;
+      sel.appendChild(opt);
+    });
+  } catch {}
+}
+
+// ─── CHART RENDERERS ───
+const chartDefaults = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } }, x: { ticks: { font: { size: 11 } } } } };
+
+function renderBarChart(canvasId, labels, data, label, color) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart($(canvasId), {
+    type: 'bar',
+    data: { labels, datasets: [{ label, data, backgroundColor: color + 'cc', borderColor: color, borderWidth: 1, borderRadius: 4 }] },
+    options: { ...chartDefaults }
+  });
+}
+
+function renderLineChart(canvasId, labels, rev, cogs) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart($(canvasId), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Revenue', data: rev, borderColor: '#2e7d32', backgroundColor: 'rgba(46,125,50,.1)', fill: true, tension: .3 },
+        { label: 'COGS', data: cogs, borderColor: '#e53935', backgroundColor: 'rgba(229,57,53,.1)', fill: true, tension: .3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } }
+    }
+  });
+}
+
+// ─── MAIN REFRESH ───
+async function refreshDashboard() {
+  clearError();
+  const startDate = $('filter-start').value;
+  const endDate = $('filter-end').value;
+  if (!startDate || !endDate) return;
+  $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
+  await Promise.all([
+    loadKPIs(startDate, endDate),
+    loadRevenueChart(endDate),
+    loadRepChart(startDate, endDate),
+    loadTrendChart(endDate),
+    loadInvoices(),
+    loadRepFilter()
+  ]);
+}
+
+// ─── INIT ───
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const rid = params.get('realmId');
+
+  if (code && rid) {
+    realmId = rid;
+    localStorage.setItem('qb_realmId', realmId);
+    try {
+      await exchangeCode(code);
+      showDashboard();
+    } catch (e) {
+      showError('OAuth failed: ' + e.message);
+      showLogin();
+    }
+  } else if (tokens && tokens.access_token && realmId) {
+    if (Date.now() > tokens.expires_at - 60000) {
+      const ok = await refreshAccessToken();
+      if (!ok) { showLogin(); return; }
+    }
+    showDashboard();
+  } else {
+    showLogin();
+  }
+})();
+</script>
+</body>
+</html>
