@@ -1,5 +1,5 @@
-const { getSession } = require('../../lib/session');
-const { apiBase, ensureFreshSession } = require('../../lib/qb');
+const { getSession } = require('../lib/session');
+const { apiBase, ensureFreshSession } = require('../lib/qb');
 
 const ALLOW = [/^\/query$/, /^\/reports\/[A-Za-z]+$/];
 
