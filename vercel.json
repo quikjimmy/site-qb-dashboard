@@ -1,7 +1,14 @@
 {
+  "framework": null,
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "routes": [
     { "src": "/auth/(.*)", "dest": "/api/auth/$1" },
-    { "src": "/api/qb/(.*)", "dest": "/api/qb" },
-    { "src": "/api/me", "dest": "/api/me" }
+    { "src": "/api/qb/(.*)", "dest": "/api/qb.js" },
+    { "src": "/api/me", "dest": "/api/me.js" },
+    { "src": "/api/test", "dest": "/api/test.js" }
   ]
 }
