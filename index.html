@@ -152,6 +152,13 @@
   .pivot-controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; font-size: .85rem; color: var(--text2); }
   .pivot-controls select { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: .85rem; }
 
+  /* Row-level warning for invoices needing attention */
+  tbody tr.needs-rep { background: #fff8e1; }
+  tbody tr.needs-rep:hover { background: #fff3cd; }
+  tbody tr.needs-items td:first-child { border-left: 3px solid var(--red); }
+  .need-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: .72rem; font-weight: 700; letter-spacing: .3px; background: var(--orange); color: #fff; }
+  .need-badge.items { background: var(--red); }
+
   /* Payment method chip in table */
   .pay-chip { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: .72rem; font-weight: 600; }
   .pay-chip.cc { background: #e3f2fd; color: #1565c0; }
@@ -256,8 +263,8 @@
         <h3>🏆 Sales Rep Leaderboard</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
-            <tbody id="leaderboard-tbody"><tr><td colspan="8" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
+            <tbody id="leaderboard-tbody"><tr><td colspan="9" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -311,7 +318,7 @@
     <div id="page-attention" class="hidden">
       <div class="table-card">
         <h3 id="attention-heading">⚠️ Requires Attention</h3>
-        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Invoices flagged for: missing sales rep (Class), missing customer, overdue and unpaid, or zero/negative total.</p>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Invoices flagged for: missing sales rep (Class), missing customer, overdue and unpaid, zero/negative total, or no product/item data (COGS can't be computed).</p>
         <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
       </div>
     </div>
@@ -507,17 +514,27 @@ function renderInvoicesTable(invoices) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices match</td></tr>';
     return;
   }
-  tbody.innerHTML = invoices.map(inv => `
-    <tr>
+  tbody.innerHTML = invoices.map(inv => {
+    const classes = [];
+    if (!inv.rep) classes.push('needs-rep');
+    if (inv.missingItemData) classes.push('needs-items');
+    const repCell = inv.rep
+      ? inv.rep
+      : '<span class="need-badge">⚠ Needs Rep</span>';
+    const docCell = inv.missingItemData
+      ? `${inv.docNum || '—'} <span class="need-badge items" title="No product/item line — COGS cannot be computed">NO ITEMS</span>`
+      : (inv.docNum || '—');
+    return `
+    <tr class="${classes.join(' ')}">
       <td>${inv.date || '—'}</td>
-      <td>${inv.docNum || '—'}</td>
+      <td>${docCell}</td>
       <td>${inv.customer || '—'}</td>
-      <td>${inv.rep || '—'}</td>
+      <td>${repCell}</td>
       <td>${fmt(inv.amount)}</td>
       <td>${fmt(inv.balance)}</td>
       <td><span class="badge ${inv.status}">${(inv.status || '').toUpperCase()}</span></td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }).join('');
 }
 
 function applyInvoiceFilters() {
@@ -688,6 +705,10 @@ function buildRows(rawInvoices, paymentMap, repFilter) {
       const total = Number(inv.TotalAmt) || 0;
       const status = balance <= 0 && total > 0 ? 'paid' : 'open';
       const overdue = balance > 0 && inv.DueDate && new Date(inv.DueDate) < today;
+      const lines = inv.Line || [];
+      const productLines = lines.filter(l => l.DetailType === 'SalesItemLineDetail');
+      const productLinesWithItem = productLines.filter(l => l.SalesItemLineDetail?.ItemRef?.value);
+      const missingItemData = total > 0 && productLinesWithItem.length === 0;
       return {
         id: inv.Id,
         date: inv.TxnDate,
@@ -700,6 +721,7 @@ function buildRows(rawInvoices, paymentMap, repFilter) {
         paid: status === 'paid',
         paymentMethod: paymentMap.get(inv.Id) || null,
         dueDate: inv.DueDate || null,
+        missingItemData,
       };
     });
 }
@@ -774,11 +796,12 @@ function renderLeaderboard(rows, classPL) {
   }
   const sorted = [...combined.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
   if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(([name, agg], i) => {
-    const gp = agg.revenue > 0 ? ((agg.revenue - agg.cogs) / agg.revenue) * 100 : 0;
+    const gpDollars = agg.revenue - agg.cogs;
+    const gpPct = agg.revenue > 0 ? (gpDollars / agg.revenue) * 100 : 0;
     const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
     const openCell = agg.openCount
       ? `<strong>${agg.openCount}</strong><div style="font-size:.75rem;color:var(--text2);">${fmt(agg.openBal)}</div>`
@@ -792,7 +815,8 @@ function renderLeaderboard(rows, classPL) {
         <td><strong>${name}</strong></td>
         <td class="leaderboard-amt">${fmt(agg.revenue)}</td>
         <td>${fmt(agg.cogs)}</td>
-        <td><strong>${pct(gp)}</strong></td>
+        <td><strong style="color:var(--qb-green);">${fmt(gpDollars)}</strong></td>
+        <td><strong>${pct(gpPct)}</strong></td>
         <td>${openCell}</td>
         <td>${overdueCell}</td>
         <td style="color:var(--text2);">${agg.count}</td>
@@ -811,6 +835,7 @@ function renderAttention(rows) {
     if (!r.customer) reasons.push('Missing customer');
     if (!r.paid && r.dueDate && new Date(r.dueDate) < today) reasons.push('Overdue');
     if (r.amount <= 0) reasons.push('Zero/negative total');
+    if (r.missingItemData) reasons.push('No item data (COGS)');
     if (reasons.length) flags.push({ ...r, reasons });
   }
   flags.sort((a, b) => b.balance - a.balance);
