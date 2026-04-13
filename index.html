@@ -97,6 +97,23 @@
 
   .hidden { display: none !important; }
 
+  /* Page nav tabs */
+  .page-nav { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .page-nav button { background: none; border: none; padding: 10px 18px; font-size: .9rem; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .page-nav button:hover { color: var(--text); }
+  .page-nav button.active { color: var(--qb-blue); border-bottom-color: var(--qb-blue); font-weight: 600; }
+
+  /* Collapsible */
+  details.table-card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  details.table-card > summary::-webkit-details-marker { display: none; }
+  details.table-card > summary::after { content: '▸'; font-size: .8rem; color: var(--text2); transition: transform .15s; }
+  details.table-card[open] > summary::after { transform: rotate(90deg); }
+  details.table-card > summary h3 { margin-bottom: 0; }
+
+  /* Invoice filter bar */
+  .invoice-filter-bar { display: flex; gap: 12px; margin: 12px 0; flex-wrap: wrap; font-size: .85rem; color: var(--text2); }
+  .invoice-filter-bar select { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: .85rem; }
+
   /* Quick filter chips */
   .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
   .chip { background: #fff; border: 1px solid var(--border); color: var(--text2); padding: 6px 14px; border-radius: 999px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: all .15s; }
@@ -175,7 +192,13 @@
 
   <!-- DASHBOARD (hidden until auth) -->
   <div id="dashboard" class="hidden">
-    <!-- Filters -->
+    <!-- Page tabs -->
+    <div class="page-nav">
+      <button data-page="dashboard" class="active" onclick="showPage('dashboard')">Dashboard</button>
+      <button data-page="attention" onclick="showPage('attention')">Requires Attention <span id="nav-attention-count" style="color:var(--text2);font-weight:500;"></span></button>
+    </div>
+
+    <!-- Shared filters -->
     <div class="filters">
       <label>Start Date<input type="date" id="filter-start"></label>
       <label>End Date<input type="date" id="filter-end"></label>
@@ -192,81 +215,104 @@
       <button class="chip" data-range="ytd">Year to Date</button>
     </div>
 
-    <!-- KPIs -->
-    <div class="kpi-grid">
-      <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
-      <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
-      <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
-      <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
-    </div>
+    <!-- PAGE: Dashboard -->
+    <div id="page-dashboard">
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
+        <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
+        <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
+        <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
+      </div>
 
-    <!-- Status breakdown: Open vs Paid (count / $ / %) -->
-    <div class="status-grid">
-      <div class="status-card open">
-        <div class="left">
-          <div class="label">Open Invoices</div>
-          <div class="value" id="status-open-amt">—</div>
-          <div class="sub" id="status-open-sub">—</div>
+      <!-- Status breakdown -->
+      <div class="status-grid">
+        <div class="status-card open">
+          <div class="left">
+            <div class="label">Open Invoices</div>
+            <div class="value" id="status-open-amt">—</div>
+            <div class="sub" id="status-open-sub">—</div>
+          </div>
+          <div class="right"><canvas id="chart-status-open"></canvas></div>
         </div>
-        <div class="right"><canvas id="chart-status-open"></canvas></div>
-      </div>
-      <div class="status-card paid">
-        <div class="left">
-          <div class="label">Paid Invoices</div>
-          <div class="value" id="status-paid-amt">—</div>
-          <div class="sub" id="status-paid-sub">—</div>
+        <div class="status-card paid">
+          <div class="left">
+            <div class="label">Paid Invoices</div>
+            <div class="value" id="status-paid-amt">—</div>
+            <div class="sub" id="status-paid-sub">—</div>
+          </div>
+          <div class="right"><canvas id="chart-status-paid"></canvas></div>
         </div>
-        <div class="right"><canvas id="chart-status-paid"></canvas></div>
       </div>
-    </div>
 
-    <!-- Charts: Revenue by Month + Sales by Rep -->
-    <div class="charts-row">
-      <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
-      <div class="chart-card"><h3>Sales by Rep</h3><canvas id="chart-rep"></canvas></div>
-    </div>
-
-    <!-- Leaderboard -->
-    <div class="table-card">
-      <h3>🏆 Sales Rep Leaderboard</h3>
-      <div id="leaderboard"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
-    </div>
-
-    <!-- Requires Attention -->
-    <div class="table-card">
-      <h3 id="attention-heading">⚠️ Requires Attention</h3>
-      <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
-    </div>
-
-    <!-- Pivot table -->
-    <div class="table-card">
-      <h3>Pivot Table</h3>
-      <div class="pivot-controls">
-        <label>Group by
-          <select id="pivot-dim">
-            <option value="rep">Sales Rep</option>
-            <option value="customer">Customer</option>
-            <option value="payment">Payment Method</option>
-            <option value="month">Month</option>
-          </select>
-        </label>
+      <!-- Charts -->
+      <div class="charts-row">
+        <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
+        <div class="chart-card"><h3>Sales by Rep</h3><canvas id="chart-rep"></canvas></div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th id="pivot-dim-header">Dimension</th><th>Invoices</th><th>Total $</th><th>Avg $</th><th>Open $</th></tr></thead>
-          <tbody id="pivot-tbody"><tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
-        </table>
+
+      <!-- Leaderboard -->
+      <div class="table-card">
+        <h3>🏆 Sales Rep Leaderboard</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP %</th><th>Invoices</th></tr></thead>
+            <tbody id="leaderboard-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
+        </div>
       </div>
+
+      <!-- Pivot table -->
+      <div class="table-card">
+        <h3>Pivot Table</h3>
+        <div class="pivot-controls">
+          <label>Group by
+            <select id="pivot-dim">
+              <option value="rep">Sales Rep</option>
+              <option value="customer">Customer</option>
+              <option value="month">Month</option>
+            </select>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th id="pivot-dim-header">Dimension</th><th>Invoices</th><th>Total $</th><th>Avg $</th><th>Open $</th></tr></thead>
+            <tbody id="pivot-tbody"><tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Invoices Table (collapsible, client-side filters) -->
+      <details class="table-card" id="invoices-details">
+        <summary><h3>Invoices in Range <span id="invoices-count" style="color:var(--text2);font-weight:500;"></span></h3></summary>
+        <div class="invoice-filter-bar">
+          <label>Status
+            <select id="invoice-filter-status">
+              <option value="">All</option>
+              <option value="open">Open</option>
+              <option value="overdue">Overdue</option>
+              <option value="paid">Paid</option>
+            </select>
+          </label>
+          <label>Rep
+            <select id="invoice-filter-rep"><option value="">All</option></select>
+          </label>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+            <tbody id="invoices-tbody"><tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </details>
     </div>
 
-    <!-- Invoices Table -->
-    <div class="table-card">
-      <h3>Invoices in Range</h3>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Paid By</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
-          <tbody id="invoices-tbody"><tr><td colspan="8" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
-        </table>
+    <!-- PAGE: Requires Attention -->
+    <div id="page-attention" class="hidden">
+      <div class="table-card">
+        <h3 id="attention-heading">⚠️ Requires Attention</h3>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Invoices flagged for: missing sales rep (Class), missing customer, overdue and unpaid, or zero/negative total.</p>
+        <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
       </div>
     </div>
   </div>
@@ -362,6 +408,9 @@ function showDashboard() {
   $('logout-btn').classList.remove('hidden');
   wireChips();
   wirePivotDim();
+  wireInvoiceFilters();
+  const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
+  showPage(initialPage);
   const [s, e] = defaultDateRange();
   $('filter-start').value = s;
   $('filter-end').value = e;
@@ -384,6 +433,16 @@ function wirePivotDim() {
   }
 }
 
+function wireInvoiceFilters() {
+  ['invoice-filter-status', 'invoice-filter-rep'].forEach(id => {
+    const el = $(id);
+    if (el && !el._wired) {
+      el._wired = true;
+      el.addEventListener('change', applyInvoiceFilters);
+    }
+  });
+}
+
 function showDemoDashboard() {
   isDemoMode = true;
   $('login-screen').classList.add('hidden');
@@ -400,6 +459,9 @@ function loadDemoData() {
   const d = DEMO_DATA;
   wireChips();
   wirePivotDim();
+  wireInvoiceFilters();
+  const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
+  showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
   $('kpi-cogs').textContent = fmt(d.kpis.cogs);
   $('kpi-profit').textContent = fmt(d.kpis.profit);
@@ -424,12 +486,14 @@ function loadDemoData() {
     dueDate: null,
   }));
   _lastRows = rows;
+  const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
+  populateInvoiceRepFilter(rows);
   renderStatusBreakdown(rows);
   renderRepChart(rows);
-  renderLeaderboard(rows);
+  renderLeaderboard(rows, demoClassPL);
   renderAttention(rows);
   renderPivot(rows);
-  renderInvoicesTable(rows);
+  applyInvoiceFilters();
   const repSelect = $('filter-rep');
   repSelect.innerHTML = '<option value="">All</option>';
   d.salesByRep.forEach(r => { repSelect.innerHTML += `<option value="${r.rep}">${r.rep}</option>`; });
@@ -437,8 +501,10 @@ function loadDemoData() {
 
 function renderInvoicesTable(invoices) {
   const tbody = $('invoices-tbody');
+  const countEl = $('invoices-count');
+  if (countEl) countEl.textContent = `(${invoices.length})`;
   if (!invoices.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text2)">No invoices in range</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices match</td></tr>';
     return;
   }
   tbody.innerHTML = invoices.map(inv => `
@@ -447,7 +513,6 @@ function renderInvoicesTable(invoices) {
       <td>${inv.docNum || '—'}</td>
       <td>${inv.customer || '—'}</td>
       <td>${inv.rep || '—'}</td>
-      <td>${renderPayChip(inv.paymentMethod)}</td>
       <td>${fmt(inv.amount)}</td>
       <td>${fmt(inv.balance)}</td>
       <td><span class="badge ${inv.status}">${(inv.status || '').toUpperCase()}</span></td>
@@ -455,15 +520,24 @@ function renderInvoicesTable(invoices) {
   `).join('');
 }
 
-function renderPayChip(method) {
-  if (!method) return '<span class="pay-chip unknown">—</span>';
-  const m = method.toLowerCase();
-  let cls = 'unknown';
-  if (/credit|visa|master|amex|discover/.test(m)) cls = 'cc';
-  else if (/cash/.test(m)) cls = 'cash';
-  else if (/check/.test(m)) cls = 'check';
-  else if (/ach|bank|e-?check|transfer/.test(m)) cls = 'ach';
-  return `<span class="pay-chip ${cls}">${method}</span>`;
+function applyInvoiceFilters() {
+  const statusFilter = $('invoice-filter-status').value;
+  const repFilter = $('invoice-filter-rep').value;
+  const filtered = _lastRows.filter(r =>
+    (!statusFilter || r.status === statusFilter) &&
+    (!repFilter || r.rep === repFilter)
+  );
+  const sorted = [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  renderInvoicesTable(sorted);
+}
+
+function populateInvoiceRepFilter(rows) {
+  const sel = $('invoice-filter-rep');
+  if (!sel) return;
+  const current = sel.value;
+  const reps = [...new Set(rows.map(r => r.rep).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All</option>' + reps.map(r => `<option value="${r}">${r}</option>`).join('');
+  if (reps.includes(current)) sel.value = current;
 }
 
 // Chart renderers
@@ -673,33 +747,39 @@ function renderRepChart(rows) {
   }
 }
 
-function renderLeaderboard(rows) {
-  const container = $('leaderboard');
-  const byRep = new Map();
+function renderLeaderboard(rows, classPL) {
+  const tbody = $('leaderboard-tbody');
+  const invoiceCount = new Map();
   for (const r of rows) {
     const key = r.rep || 'Unassigned';
-    const agg = byRep.get(key) || { total: 0, count: 0, open: 0 };
-    agg.total += r.amount;
-    agg.count += 1;
-    if (!r.paid) agg.open += r.balance;
-    byRep.set(key, agg);
+    invoiceCount.set(key, (invoiceCount.get(key) || 0) + 1);
   }
-  const sorted = [...byRep.entries()].sort((a, b) => b[1].total - a[1].total);
+  const combined = new Map();
+  for (const [key, pl] of (classPL || new Map())) {
+    combined.set(key, { revenue: pl.income, cogs: pl.cogs, count: invoiceCount.get(key) || 0 });
+  }
+  for (const [key, count] of invoiceCount) {
+    if (!combined.has(key)) combined.set(key, { revenue: 0, cogs: 0, count });
+  }
+  const sorted = [...combined.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
   if (!sorted.length) {
-    container.innerHTML = '<div class="attention-empty">No sales in range.</div>';
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
     return;
   }
-  container.innerHTML = sorted.map(([name, agg], i) => `
-    <div class="leaderboard-row">
-      <div class="leaderboard-rank ${i < 3 ? 'top' : ''}">${i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1)}</div>
-      <div>
-        <div class="leaderboard-name">${name}</div>
-        <div class="leaderboard-count">${agg.count} invoice${agg.count === 1 ? '' : 's'} · ${fmt(agg.open)} open</div>
-      </div>
-      <div class="leaderboard-amt">${fmt(agg.total)}</div>
-      <div></div>
-    </div>
-  `).join('');
+  tbody.innerHTML = sorted.map(([name, agg], i) => {
+    const gp = agg.revenue > 0 ? ((agg.revenue - agg.cogs) / agg.revenue) * 100 : 0;
+    const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
+    return `
+      <tr>
+        <td class="leaderboard-rank ${i < 3 ? 'top' : ''}">${rank}</td>
+        <td><strong>${name}</strong></td>
+        <td class="leaderboard-amt">${fmt(agg.revenue)}</td>
+        <td>${fmt(agg.cogs)}</td>
+        <td><strong>${pct(gp)}</strong></td>
+        <td style="color:var(--text2);">${agg.count}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderAttention(rows) {
@@ -716,6 +796,8 @@ function renderAttention(rows) {
   }
   flags.sort((a, b) => b.balance - a.balance);
   $('attention-heading').innerHTML = `⚠️ Requires Attention <span style="font-size:.8rem;color:var(--text2);font-weight:500;">(${flags.length})</span>`;
+  const navCount = $('nav-attention-count');
+  if (navCount) navCount.textContent = flags.length ? `(${flags.length})` : '';
   if (!flags.length) {
     list.innerHTML = '<div class="attention-empty">All clear — no flagged invoices in range.</div>';
     return;
@@ -739,10 +821,9 @@ function renderPivot(rows) {
   const getKey = {
     rep: r => r.rep || 'Unassigned',
     customer: r => r.customer || 'Unknown',
-    payment: r => r.paymentMethod || 'Unpaid / Unknown',
     month: r => r.date ? r.date.slice(0, 7) : 'Unknown',
   }[dim];
-  header.textContent = { rep: 'Sales Rep', customer: 'Customer', payment: 'Payment Method', month: 'Month' }[dim];
+  header.textContent = { rep: 'Sales Rep', customer: 'Customer', month: 'Month' }[dim];
   const map = new Map();
   for (const r of rows) {
     const key = getKey(r);
@@ -795,6 +876,34 @@ function setQuickRange(kind) {
 // Cached rows for pivot dim changes without re-fetching
 let _lastRows = [];
 
+async function loadClassPL(startDate, endDate) {
+  const map = new Map();
+  try {
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Classes`);
+    const cols = pl?.Columns?.Column || [];
+    // First column is the label, subsequent columns are classes (and possibly a Total at the end)
+    const classNames = cols.slice(1).map(c => c.ColTitle || '');
+    const rows = pl?.Rows?.Row || [];
+    const income = findPLSection(rows, ['Total Income']) || [];
+    const cogs = findPLSection(rows, ['Total Cost of Goods Sold']) || [];
+    classNames.forEach((name, i) => {
+      if (!name || /^total$/i.test(name)) return;
+      map.set(name, {
+        income: Number(income[i]) || 0,
+        cogs: Math.abs(Number(cogs[i]) || 0),
+      });
+    });
+  } catch {}
+  return map;
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page-nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name));
+  $('page-dashboard').classList.toggle('hidden', name !== 'dashboard');
+  $('page-attention').classList.toggle('hidden', name !== 'attention');
+  location.hash = name;
+}
+
 async function refreshDashboard() {
   clearError();
   const startDate = $('filter-start').value;
@@ -806,22 +915,23 @@ async function refreshDashboard() {
 
   const invoicesFetch = loadAllInvoices(startDate, endDate);
   const paymentsFetch = loadPaymentMap(startDate, endDate);
+  const classPLFetch = loadClassPL(startDate, endDate);
 
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadMonthlyRevenueChart(endDate),
     loadRepFilter(),
     (async () => {
-      const [rawInvoices, paymentMap] = await Promise.all([invoicesFetch, paymentsFetch]);
+      const [rawInvoices, paymentMap, classPL] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch]);
       const rows = buildRows(rawInvoices, paymentMap, repFilter);
       _lastRows = rows;
+      populateInvoiceRepFilter(rows);
       renderStatusBreakdown(rows);
       renderRepChart(rows);
-      renderLeaderboard(rows);
+      renderLeaderboard(rows, classPL);
       renderAttention(rows);
       renderPivot(rows);
-      const recent = [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 50);
-      renderInvoicesTable(recent);
+      applyInvoiceFilters();
     })(),
   ]);
 }
