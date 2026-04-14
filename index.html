@@ -84,6 +84,12 @@
   /* Attention filter chips */
   .attention-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 
+  /* Sortable table headers */
+  .sortable-table thead th { cursor: pointer; user-select: none; }
+  .sortable-table thead th:hover { color: var(--text); }
+  .sortable-table thead th.sort-active { color: var(--qb-blue); }
+  .sort-ind { margin-left: 4px; font-size: .7rem; }
+
   /* Table */
   .table-card { background: var(--card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; }
   .table-card h3 { font-size: .85rem; margin-bottom: 14px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
@@ -247,6 +253,7 @@
       <label>Start Date<input type="date" id="filter-start"></label>
       <label>End Date<input type="date" id="filter-end"></label>
       <label>Sales Rep / Class<select id="filter-rep"><option value="">All</option></select></label>
+      <label>Product<select id="filter-product"><option value="">All Armovex Products</option></select></label>
       <button class="apply-btn" onclick="refreshDashboard()">Apply</button>
     </div>
 
@@ -319,23 +326,6 @@
         </div>
       </div>
 
-      <!-- Top Products table -->
-      <div class="table-card">
-        <div class="chart-header">
-          <h3 id="products-chart-title">Top Products · 6 months</h3>
-          <div class="segmented view-toggle">
-            <button data-mode="monthly" class="active">Month</button>
-            <button data-mode="weekly">Week</button>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Product</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th>Units</th></tr></thead>
-            <tbody id="products-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
       <!-- Leaderboard -->
       <div class="table-card">
         <h3>🏆 Sales Rep Leaderboard</h3>
@@ -343,6 +333,24 @@
           <table>
             <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th title="Paid$ / (Paid$ + Lost$) — lost = 90+ days overdue">Close %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
             <tbody id="leaderboard-tbody"><tr><td colspan="10" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Top Products table -->
+      <div class="table-card">
+        <h3>Top Products <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· paid invoices in date range</span></h3>
+        <div class="table-wrap">
+          <table class="sortable-table" id="products-table">
+            <thead><tr>
+              <th data-sort="name">Product</th>
+              <th data-sort="revenue" class="sort-active">Gross Revenue <span class="sort-ind">▼</span></th>
+              <th data-sort="cogs">COGS</th>
+              <th data-sort="gp">GP $</th>
+              <th data-sort="gpPct">GP %</th>
+              <th data-sort="qty">Units</th>
+            </tr></thead>
+            <tbody id="products-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -509,6 +517,8 @@ function showDashboard() {
   wireInvoiceFilters();
   wireViewToggle();
   wireAttentionFilters();
+  wireProductSort();
+  wireProductFilter();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   const [s, e] = defaultDateRange();
@@ -552,7 +562,7 @@ function wireViewToggle() {
       _viewMode = btn.dataset.mode;
       syncViewToggleUI();
       const endDate = $('filter-end').value;
-      await Promise.all([loadRevenueChart(endDate), loadTopProducts(endDate)]);
+      await loadRevenueChart(endDate);
     });
   });
   syncViewToggleUI();
@@ -561,7 +571,6 @@ function wireViewToggle() {
 function syncViewToggleUI() {
   document.querySelectorAll('.view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
   $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week · Mon–Sun' : 'Revenue by Month';
-  $('products-chart-title').textContent = _viewMode === 'weekly' ? 'Top Products · 8 weeks' : 'Top Products · 6 months';
 }
 
 function wireAttentionFilters() {
@@ -595,6 +604,8 @@ function loadDemoData() {
   wireInvoiceFilters();
   wireViewToggle();
   wireAttentionFilters();
+  wireProductSort();
+  wireProductFilter();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
@@ -962,10 +973,20 @@ async function loadPaymentMap(startDate, endDate) {
   return map;
 }
 
-function buildRows(rawInvoices, paymentMap, repFilter) {
+function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
   const today = new Date();
+  const hasProduct = (inv, name) => {
+    for (const line of (inv.Line || [])) {
+      if (line.DetailType !== 'SalesItemLineDetail') continue;
+      const ref = line.SalesItemLineDetail?.ItemRef;
+      if (!ref) continue;
+      if (ref.name === name) return true;
+    }
+    return false;
+  };
   return rawInvoices
     .filter(inv => !repFilter || inv.ClassRef?.name === repFilter)
+    .filter(inv => !productFilter || hasProduct(inv, productFilter))
     .map(inv => {
       const balance = Number(inv.Balance) || 0;
       const total = Number(inv.TotalAmt) || 0;
@@ -1045,35 +1066,48 @@ function weeklyRange(endDate) {
   return { start: ymd(start), end: ymd(weekEnd) };
 }
 
-async function loadPeriodInvoices(endDate) {
-  const range = _viewMode === 'weekly' ? weeklyRange(endDate) : monthlyRange(endDate);
-  try {
-    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${range.start}' AND TxnDate <= '${range.end}' MAXRESULTS 1000`);
-    return data?.Invoice || [];
-  } catch { return []; }
-}
-
 // Cached across the session — items rarely change during a visit.
 let _itemCostMap = null;
+let _itemNames = [];
 async function loadItemCostMap() {
   if (_itemCostMap) return _itemCostMap;
   try {
     const data = await qbQuery(`SELECT * FROM Item MAXRESULTS 1000`);
     const map = new Map();
+    const names = new Set();
     for (const item of data?.Item || []) {
       map.set(item.Name, Number(item.PurchaseCost) || 0);
+      names.add(item.FullyQualifiedName || item.Name);
       if (item.FullyQualifiedName && item.FullyQualifiedName !== item.Name) {
         map.set(item.FullyQualifiedName, Number(item.PurchaseCost) || 0);
       }
     }
     _itemCostMap = map;
+    _itemNames = [...names].sort();
     return map;
   } catch { return new Map(); }
 }
 
+async function populateProductFilter() {
+  await loadItemCostMap();
+  const sel = $('filter-product');
+  if (!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">All Armovex Products</option>' + _itemNames.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (_itemNames.includes(current)) sel.value = current;
+}
+
+// Table sort + filter state
+let _productSort = { col: 'revenue', dir: 'desc' };
+const _productColDirDefault = { name: 'asc', revenue: 'desc', cogs: 'desc', gp: 'desc', gpPct: 'desc', qty: 'desc' };
+let _lastProductAgg = new Map();
+
 function aggregateProducts(invoices, costMap) {
   const byProduct = new Map();
   for (const inv of invoices) {
+    // Gross Revenue column reflects PAID invoices only
+    const isPaid = (Number(inv.Balance) || 0) <= 0 && (Number(inv.TotalAmt) || 0) > 0;
+    if (!isPaid) continue;
     for (const line of (inv.Line || [])) {
       if (line.DetailType !== 'SalesItemLineDetail') continue;
       const detail = line.SalesItemLineDetail;
@@ -1095,15 +1129,48 @@ function aggregateProducts(invoices, costMap) {
   return byProduct;
 }
 
+function productRowValue(name, agg, col) {
+  if (col === 'name') return name.toLowerCase();
+  if (col === 'revenue') return agg.revenue;
+  if (col === 'cogs') return agg.hasCost ? agg.cogs : -1;
+  if (col === 'gp') return agg.hasCost ? agg.revenue - agg.cogs : -Infinity;
+  if (col === 'gpPct') return agg.hasCost && agg.revenue > 0 ? (agg.revenue - agg.cogs) / agg.revenue : -Infinity;
+  if (col === 'qty') return agg.qty || 0;
+  return 0;
+}
+
 function renderTopProductsTable(byProduct) {
+  _lastProductAgg = byProduct;
   const tbody = $('products-tbody');
-  const sorted = [...byProduct.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 50);
-  if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No product data in this window</td></tr>';
+  const entries = [...byProduct.entries()];
+  const { col, dir } = _productSort;
+  entries.sort((a, b) => {
+    const va = productRowValue(a[0], a[1], col);
+    const vb = productRowValue(b[0], b[1], col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  // Refresh header indicators
+  document.querySelectorAll('#products-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    const ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      const span = document.createElement('span');
+      span.className = 'sort-ind';
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(span);
+    }
+    th.querySelector('.sort-ind').textContent = dir === 'asc' ? '▲' : '▼';
+  });
+  if (!entries.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No paid invoices with product lines in this range</td></tr>';
     return;
   }
   const dash = '<span style="color:var(--text2);">—</span>';
-  tbody.innerHTML = sorted.map(([name, agg]) => {
+  tbody.innerHTML = entries.slice(0, 100).map(([name, agg]) => {
     const gp = agg.revenue - agg.cogs;
     const gpPct = agg.revenue > 0 ? (gp / agg.revenue) * 100 : 0;
     return `
@@ -1119,12 +1186,32 @@ function renderTopProductsTable(byProduct) {
   }).join('');
 }
 
-async function loadTopProducts(endDate) {
-  try {
-    const [invoices, costMap] = await Promise.all([loadPeriodInvoices(endDate), loadItemCostMap()]);
-    renderTopProductsTable(aggregateProducts(invoices, costMap));
-  } catch {
-    renderTopProductsTable(new Map());
+async function loadTopProducts(rawInvoices) {
+  const costMap = await loadItemCostMap();
+  renderTopProductsTable(aggregateProducts(rawInvoices, costMap));
+}
+
+function wireProductSort() {
+  document.querySelectorAll('#products-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (_productSort.col === col) {
+        _productSort.dir = _productSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _productSort = { col, dir: _productColDirDefault[col] || 'desc' };
+      }
+      renderTopProductsTable(_lastProductAgg);
+    });
+  });
+}
+
+function wireProductFilter() {
+  const sel = $('filter-product');
+  if (sel && !sel._wired) {
+    sel._wired = true;
+    sel.addEventListener('change', refreshDashboard);
   }
 }
 
@@ -1339,6 +1426,7 @@ async function refreshDashboard() {
   $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
 
   const repFilter = $('filter-rep').value || null;
+  const productFilter = $('filter-product').value || null;
 
   const invoicesFetch = loadAllInvoices(startDate, endDate);
   const paymentsFetch = loadPaymentMap(startDate, endDate);
@@ -1348,11 +1436,12 @@ async function refreshDashboard() {
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadRevenueChart(endDate),
-    loadTopProducts(endDate),
     loadRepFilter(),
+    populateProductFilter(),
     (async () => {
       const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
-      const rows = buildRows(rawInvoices, paymentMap, repFilter);
+      const filteredRaw = productFilter ? rawInvoices.filter(inv => (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter)) : rawInvoices;
+      const rows = buildRows(rawInvoices, paymentMap, repFilter, productFilter);
       _lastRows = rows;
       populateInvoiceRepFilter(rows);
       renderInvoiceActivityKpis(activity, rows);
@@ -1361,6 +1450,7 @@ async function refreshDashboard() {
       renderAttention(rows);
       renderPivot(rows);
       applyInvoiceFilters();
+      loadTopProducts(filteredRaw);
     })(),
   ]);
 }
