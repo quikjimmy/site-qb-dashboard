@@ -310,14 +310,23 @@
         <div class="chart-card">
           <div class="chart-header">
             <h3 id="revenue-chart-title">Revenue by Month</h3>
-            <div class="segmented" id="revenue-view-toggle">
+            <div class="segmented view-toggle">
               <button data-mode="monthly" class="active">Month</button>
               <button data-mode="weekly">Week</button>
             </div>
           </div>
           <canvas id="chart-revenue"></canvas>
         </div>
-        <div class="chart-card"><h3>Sales by Rep</h3><canvas id="chart-rep"></canvas></div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 id="rep-chart-title">Sales by Rep · 6 months</h3>
+            <div class="segmented view-toggle">
+              <button data-mode="monthly" class="active">Month</button>
+              <button data-mode="weekly">Week</button>
+            </div>
+          </div>
+          <canvas id="chart-rep"></canvas>
+        </div>
       </div>
 
       <!-- Leaderboard -->
@@ -528,17 +537,24 @@ function wireInvoiceFilters() {
 }
 
 function wireViewToggle() {
-  document.querySelectorAll('#revenue-view-toggle button').forEach(btn => {
+  document.querySelectorAll('.view-toggle button').forEach(btn => {
     if (btn._wired) return;
     btn._wired = true;
     btn.addEventListener('click', async () => {
       if (_viewMode === btn.dataset.mode) return;
       _viewMode = btn.dataset.mode;
-      document.querySelectorAll('#revenue-view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
-      $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week (Mon–Sun)' : 'Revenue by Month';
-      await loadRevenueChart($('filter-end').value);
+      syncViewToggleUI();
+      const endDate = $('filter-end').value;
+      await Promise.all([loadRevenueChart(endDate), loadRepChart(endDate)]);
     });
   });
+  syncViewToggleUI();
+}
+
+function syncViewToggleUI() {
+  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
+  $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week · Mon–Sun' : 'Revenue by Month';
+  $('rep-chart-title').textContent = _viewMode === 'weekly' ? 'Sales by Rep · 8 weeks' : 'Sales by Rep · 6 months';
 }
 
 function wireAttentionFilters() {
@@ -602,7 +618,7 @@ function loadDemoData() {
   populateInvoiceRepFilter(rows);
   renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
   renderStatusBreakdown(rows);
-  renderRepChart(rows, demoClassPL);
+  renderRepChartFromClassPL(demoClassPL);
   renderLeaderboard(rows, demoClassPL);
   renderAttention(rows);
   renderPivot(rows);
@@ -996,33 +1012,38 @@ function renderMiniDonut(canvasId, primary, secondary, color) {
   });
 }
 
-function renderRepChart(rows, classPL) {
-  // Match leaderboard: use P&L Total Income per Class (excludes sales tax,
-  // non-income lines). Fall back to summed invoice totals if the P&L
-  // report failed to load.
+function renderRepChartFromClassPL(classPL) {
   const byRep = new Map();
-  if (classPL && classPL.size) {
-    for (const [name, pl] of classPL) byRep.set(name, pl.income || 0);
-    // Also show reps that appear in invoices but not in classPL (typically
-    // Unassigned, since rows without a Class are not in the class-grouped P&L).
-    const seen = new Set(byRep.keys());
-    const fallback = new Map();
-    for (const r of rows) {
-      const key = r.rep || 'Unassigned';
-      if (!seen.has(key)) fallback.set(key, (fallback.get(key) || 0) + r.amount);
-    }
-    for (const [k, v] of fallback) byRep.set(k, v);
-  } else {
-    for (const r of rows) {
-      const key = r.rep || 'Unassigned';
-      byRep.set(key, (byRep.get(key) || 0) + r.amount);
-    }
-  }
+  for (const [name, pl] of (classPL || new Map())) byRep.set(name, pl.income || 0);
   const sorted = [...byRep.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
   if (!sorted.length) {
     renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#6a59e5');
   } else {
     renderBarChart('chart-rep', sorted.map(e => e[0]), sorted.map(e => e[1]), 'Sales by Rep', '#6a59e5');
+  }
+}
+
+function monthlyRange(endDate) {
+  const months = lastMonths(endDate, 6);
+  return { start: months[0].start, end: months[months.length - 1].end };
+}
+
+function weeklyRange(endDate) {
+  const end = new Date(endDate);
+  const endDay = end.getDay();
+  const daysToSun = endDay === 0 ? 0 : 7 - endDay;
+  const weekEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + daysToSun);
+  const start = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate() - 8 * 7 + 1);
+  return { start: ymd(start), end: ymd(weekEnd) };
+}
+
+async function loadRepChart(endDate) {
+  const range = _viewMode === 'weekly' ? weeklyRange(endDate) : monthlyRange(endDate);
+  try {
+    const classPL = await loadClassPL(range.start, range.end);
+    renderRepChartFromClassPL(classPL);
+  } catch {
+    renderRepChartFromClassPL(new Map());
   }
 }
 
@@ -1237,6 +1258,7 @@ async function refreshDashboard() {
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadRevenueChart(endDate),
+    loadRepChart(endDate),
     loadRepFilter(),
     (async () => {
       const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
@@ -1245,7 +1267,6 @@ async function refreshDashboard() {
       populateInvoiceRepFilter(rows);
       renderInvoiceActivityKpis(activity, rows);
       renderStatusBreakdown(rows);
-      renderRepChart(rows, classPL);
       renderLeaderboard(rows, classPL);
       renderAttention(rows);
       renderPivot(rows);
