@@ -21,8 +21,8 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
   .topbar { background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 8px rgba(0,0,0,.15); }
-  .topbar .brand { display: flex; align-items: center; gap: 12px; }
-  .topbar .brand img { height: 32px; width: auto; display: block; }
+  .topbar .brand { display: flex; align-items: center; gap: 16px; }
+  .topbar .brand img { height: 80px; width: auto; display: block; }
   .topbar h1 { font-size: 1.25rem; font-weight: 600; letter-spacing: .3px; }
   .topbar .status { font-size: .85rem; opacity: .9; }
   .topbar button { background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.35); color: #fff; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-size: .85rem; font-weight: 500; transition: background .2s; }
@@ -34,7 +34,7 @@
 
   /* Login screen */
   .login-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 70vh; text-align: center; }
-  .login-screen .logo { width: 80px; margin-bottom: 20px; }
+  .login-screen .logo { height: 140px; width: auto; margin-bottom: 24px; padding: 20px 32px; background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 100%); border-radius: 16px; box-shadow: 0 4px 14px rgba(46,125,50,.25); }
   .login-screen h2 { font-size: 1.5rem; margin-bottom: 8px; }
   .login-screen p { color: var(--text2); margin-bottom: 24px; max-width: 420px; }
   .login-screen .qb-btn { background: #2e7d32; color: #fff; border: none; padding: 14px 32px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; transition: transform .1s, box-shadow .2s; box-shadow: 0 2px 8px rgba(46,125,50,.3); }
@@ -203,7 +203,7 @@
 <div class="container">
   <!-- LOGIN SCREEN -->
   <div id="login-screen" class="login-screen">
-    <svg class="logo" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" fill="#2e7d32"/><path d="M16 24a8 8 0 1 1 16 0" stroke="#fff" stroke-width="3" fill="none"/><circle cx="24" cy="24" r="3" fill="#fff"/></svg>
+    <img class="logo" src="/assets/tch_white_v3.avif" alt="Ops Hub">
     <h2>Connect to QuickBooks</h2>
     <p>Authorize this dashboard to read your QuickBooks Online company data. Only read-only access is requested.</p>
     <button class="qb-btn" onclick="startOAuth()">
@@ -242,7 +242,15 @@
 
     <!-- PAGE: Dashboard -->
     <div id="page-dashboard">
-      <!-- KPIs -->
+      <!-- Invoice Activity KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card profit"><div class="label">Invoices Created Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
+        <div class="kpi-card revenue"><div class="label">Invoices This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
+        <div class="kpi-card margin"><div class="label">Invoices This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
+        <div class="kpi-card cogs"><div class="label">Invoices In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
+      </div>
+
+      <!-- Financial KPIs -->
       <div class="kpi-grid">
         <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
         <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
@@ -521,6 +529,7 @@ function loadDemoData() {
   _lastRows = rows;
   const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
   populateInvoiceRepFilter(rows);
+  renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
   renderStatusBreakdown(rows);
   renderRepChart(rows, demoClassPL);
   renderLeaderboard(rows, demoClassPL);
@@ -598,12 +607,46 @@ function populateInvoiceRepFilter(rows) {
 }
 
 // Chart renderers
+const valuePillPlugin = {
+  id: 'valuePill',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    const meta = chart.getDatasetMeta(0);
+    if (!meta || !meta.data) return;
+    ctx.save();
+    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    meta.data.forEach((bar, i) => {
+      const value = chart.data.datasets[0].data[i];
+      if (!value) return;
+      const label = '$' + Math.round(value).toLocaleString();
+      const textWidth = ctx.measureText(label).width;
+      const padX = 8, pillH = 18, radius = 9;
+      const x = bar.x;
+      const y = Math.max(bar.y - 6, pillH / 2 + 2);
+      const pillX = x - textWidth / 2 - padX;
+      const pillY = y - pillH;
+      const pillW = textWidth + padX * 2;
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(pillX, pillY, pillW, pillH, radius);
+      else ctx.rect(pillX, pillY, pillW, pillH);
+      ctx.fillStyle = 'rgba(26,26,46,.85)';
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, x, pillY + pillH / 2 + 0.5);
+    });
+    ctx.restore();
+  }
+};
+
 function renderBarChart(canvasId, labels, values, label, color) {
   if (charts[canvasId]) charts[canvasId].destroy();
   charts[canvasId] = new Chart($(canvasId), {
     type: 'bar',
-    data: { labels, datasets: [{ label, data: values, backgroundColor: color, borderRadius: 4 }] },
-    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } } }
+    data: { labels, datasets: [{ label, data: values, backgroundColor: color, borderRadius: 10, borderSkipped: false }] },
+    options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, plugins: { legend: { display: false }, tooltip: { enabled: true } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } } },
+    plugins: [valuePillPlugin]
   });
 }
 
@@ -718,6 +761,44 @@ async function loadAllInvoices(startDate, endDate) {
     const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
     return data?.Invoice || [];
   } catch { return []; }
+}
+
+async function loadInvoiceActivity() {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const startStr = ymd(start);
+  const endStr = ymd(today);
+  try {
+    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startStr}' AND TxnDate <= '${endStr}' MAXRESULTS 1000`);
+    const invoices = data?.Invoice || [];
+    const todayStr = ymd(today);
+    const weekStartStr = ymd(weekStart(today));
+    const monthStartStr = ymd(new Date(today.getFullYear(), today.getMonth(), 1));
+    const sumIf = pred => invoices.filter(pred).reduce((s, inv) => s + (Number(inv.TotalAmt) || 0), 0);
+    const countIf = pred => invoices.filter(pred).length;
+    return {
+      today: countIf(inv => inv.TxnDate === todayStr),
+      todayAmt: sumIf(inv => inv.TxnDate === todayStr),
+      week: countIf(inv => inv.TxnDate >= weekStartStr && inv.TxnDate <= todayStr),
+      weekAmt: sumIf(inv => inv.TxnDate >= weekStartStr && inv.TxnDate <= todayStr),
+      month: countIf(inv => inv.TxnDate >= monthStartStr && inv.TxnDate <= todayStr),
+      monthAmt: sumIf(inv => inv.TxnDate >= monthStartStr && inv.TxnDate <= todayStr),
+    };
+  } catch {
+    return { today: 0, todayAmt: 0, week: 0, weekAmt: 0, month: 0, monthAmt: 0 };
+  }
+}
+
+function renderInvoiceActivityKpis(activity, rangeRows) {
+  $('kpi-inv-today').textContent = String(activity.today);
+  $('kpi-inv-today-sub').textContent = activity.today ? fmt(activity.todayAmt) : 'No invoices yet today';
+  $('kpi-inv-week').textContent = String(activity.week);
+  $('kpi-inv-week-sub').textContent = fmt(activity.weekAmt);
+  $('kpi-inv-month').textContent = String(activity.month);
+  $('kpi-inv-month-sub').textContent = fmt(activity.monthAmt);
+  const rangeAmt = rangeRows.reduce((s, r) => s + r.amount, 0);
+  $('kpi-inv-range').textContent = String(rangeRows.length);
+  $('kpi-inv-range-sub').textContent = fmt(rangeAmt);
 }
 
 async function loadPaymentMap(startDate, endDate) {
@@ -1024,16 +1105,18 @@ async function refreshDashboard() {
   const invoicesFetch = loadAllInvoices(startDate, endDate);
   const paymentsFetch = loadPaymentMap(startDate, endDate);
   const classPLFetch = loadClassPL(startDate, endDate);
+  const activityFetch = loadInvoiceActivity();
 
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadMonthlyRevenueChart(endDate),
     loadRepFilter(),
     (async () => {
-      const [rawInvoices, paymentMap, classPL] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch]);
+      const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
       const rows = buildRows(rawInvoices, paymentMap, repFilter);
       _lastRows = rows;
       populateInvoiceRepFilter(rows);
+      renderInvoiceActivityKpis(activity, rows);
       renderStatusBreakdown(rows);
       renderRepChart(rows, classPL);
       renderLeaderboard(rows, classPL);
