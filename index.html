@@ -305,8 +305,8 @@
         </div>
       </div>
 
-      <!-- Charts -->
-      <div class="charts-row">
+      <!-- Revenue chart -->
+      <div class="charts-row single">
         <div class="chart-card">
           <div class="chart-header">
             <h3 id="revenue-chart-title">Revenue by Month</h3>
@@ -317,15 +317,22 @@
           </div>
           <canvas id="chart-revenue"></canvas>
         </div>
-        <div class="chart-card">
-          <div class="chart-header">
-            <h3 id="products-chart-title">Top Products · 6 months</h3>
-            <div class="segmented view-toggle">
-              <button data-mode="monthly" class="active">Month</button>
-              <button data-mode="weekly">Week</button>
-            </div>
+      </div>
+
+      <!-- Top Products table -->
+      <div class="table-card">
+        <div class="chart-header">
+          <h3 id="products-chart-title">Top Products · 6 months</h3>
+          <div class="segmented view-toggle">
+            <button data-mode="monthly" class="active">Month</button>
+            <button data-mode="weekly">Week</button>
           </div>
-          <canvas id="chart-products"></canvas>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Product</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th>Units</th></tr></thead>
+            <tbody id="products-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
         </div>
       </div>
 
@@ -334,8 +341,8 @@
         <h3>🏆 Sales Rep Leaderboard</h3>
         <div class="table-wrap">
           <table>
-            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
-            <tbody id="leaderboard-tbody"><tr><td colspan="9" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th title="Paid$ / (Paid$ + Lost$) — lost = 90+ days overdue">Close %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
+            <tbody id="leaderboard-tbody"><tr><td colspan="10" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -619,13 +626,13 @@ function loadDemoData() {
   renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
   renderStatusBreakdown(rows);
   const demoProducts = new Map([
-    ['Installation Service', { revenue: 184200, qty: 52, invoices: new Set() }],
-    ['Premium Flooring', { revenue: 142300, qty: 610, invoices: new Set() }],
-    ['Sub-floor Prep', { revenue: 98400, qty: 142, invoices: new Set() }],
-    ['Consultation', { revenue: 52275, qty: 38, invoices: new Set() }],
-    ['Materials Markup', { revenue: 31800, qty: 0, invoices: new Set() }],
+    ['Installation Service', { revenue: 184200, qty: 52, cogs: 82000, hasCost: true }],
+    ['Premium Flooring', { revenue: 142300, qty: 610, cogs: 81400, hasCost: true }],
+    ['Sub-floor Prep', { revenue: 98400, qty: 142, cogs: 52200, hasCost: true }],
+    ['Consultation', { revenue: 52275, qty: 38, cogs: 0, hasCost: false }],
+    ['Materials Markup', { revenue: 31800, qty: 0, cogs: 18900, hasCost: true }],
   ]);
-  renderTopProductsChart(demoProducts);
+  renderTopProductsTable(demoProducts);
   renderLeaderboard(rows, demoClassPL);
   renderAttention(rows);
   renderPivot(rows);
@@ -963,7 +970,10 @@ function buildRows(rawInvoices, paymentMap, repFilter) {
       const balance = Number(inv.Balance) || 0;
       const total = Number(inv.TotalAmt) || 0;
       const status = balance <= 0 && total > 0 ? 'paid' : 'open';
-      const overdue = balance > 0 && inv.DueDate && new Date(inv.DueDate) < today;
+      const due = inv.DueDate ? new Date(inv.DueDate) : null;
+      const overdue = balance > 0 && due && due < today;
+      const daysOverdue = overdue ? Math.floor((today - due) / 86400000) : 0;
+      const lost = overdue && daysOverdue >= 90;
       const lines = inv.Line || [];
       const productLines = lines.filter(l => l.DetailType === 'SalesItemLineDetail');
       const productLinesWithItem = productLines.filter(l => l.SalesItemLineDetail?.ItemRef?.value);
@@ -980,6 +990,8 @@ function buildRows(rawInvoices, paymentMap, repFilter) {
         paid: status === 'paid',
         paymentMethod: paymentMap.get(inv.Id) || null,
         dueDate: inv.DueDate || null,
+        daysOverdue,
+        lost,
         missingItemData,
       };
     });
@@ -1041,7 +1053,25 @@ async function loadPeriodInvoices(endDate) {
   } catch { return []; }
 }
 
-function aggregateProducts(invoices) {
+// Cached across the session — items rarely change during a visit.
+let _itemCostMap = null;
+async function loadItemCostMap() {
+  if (_itemCostMap) return _itemCostMap;
+  try {
+    const data = await qbQuery(`SELECT * FROM Item MAXRESULTS 1000`);
+    const map = new Map();
+    for (const item of data?.Item || []) {
+      map.set(item.Name, Number(item.PurchaseCost) || 0);
+      if (item.FullyQualifiedName && item.FullyQualifiedName !== item.Name) {
+        map.set(item.FullyQualifiedName, Number(item.PurchaseCost) || 0);
+      }
+    }
+    _itemCostMap = map;
+    return map;
+  } catch { return new Map(); }
+}
+
+function aggregateProducts(invoices, costMap) {
   const byProduct = new Map();
   for (const inv of invoices) {
     for (const line of (inv.Line || [])) {
@@ -1051,41 +1081,62 @@ function aggregateProducts(invoices) {
       const name = detail.ItemRef.name || 'Unknown';
       const amount = Number(line.Amount) || 0;
       const qty = Number(detail.Qty) || 0;
-      const agg = byProduct.get(name) || { revenue: 0, qty: 0, invoices: new Set() };
+      const unitCost = costMap?.get(name) || 0;
+      const agg = byProduct.get(name) || { revenue: 0, qty: 0, cogs: 0, hasCost: false };
       agg.revenue += amount;
       agg.qty += qty;
-      agg.invoices.add(inv.Id);
+      if (unitCost > 0) {
+        agg.cogs += unitCost * qty;
+        agg.hasCost = true;
+      }
       byProduct.set(name, agg);
     }
   }
   return byProduct;
 }
 
-function renderTopProductsChart(byProduct) {
-  const sorted = [...byProduct.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 10);
+function renderTopProductsTable(byProduct) {
+  const tbody = $('products-tbody');
+  const sorted = [...byProduct.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 50);
   if (!sorted.length) {
-    renderBarChart('chart-products', ['No data'], [0], 'Revenue', '#6a59e5');
-  } else {
-    renderBarChart('chart-products', sorted.map(e => e[0]), sorted.map(e => e[1].revenue), 'Revenue', '#6a59e5');
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No product data in this window</td></tr>';
+    return;
   }
+  const dash = '<span style="color:var(--text2);">—</span>';
+  tbody.innerHTML = sorted.map(([name, agg]) => {
+    const gp = agg.revenue - agg.cogs;
+    const gpPct = agg.revenue > 0 ? (gp / agg.revenue) * 100 : 0;
+    return `
+      <tr>
+        <td><strong>${name}</strong></td>
+        <td class="leaderboard-amt">${fmt(agg.revenue)}</td>
+        <td>${agg.hasCost ? fmt(agg.cogs) : dash}</td>
+        <td>${agg.hasCost ? `<strong style="color:var(--qb-green);">${fmt(gp)}</strong>` : dash}</td>
+        <td>${agg.hasCost ? `<strong>${pct(gpPct)}</strong>` : dash}</td>
+        <td style="color:var(--text2);">${agg.qty || dash}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 async function loadTopProducts(endDate) {
   try {
-    const invoices = await loadPeriodInvoices(endDate);
-    renderTopProductsChart(aggregateProducts(invoices));
+    const [invoices, costMap] = await Promise.all([loadPeriodInvoices(endDate), loadItemCostMap()]);
+    renderTopProductsTable(aggregateProducts(invoices, costMap));
   } catch {
-    renderTopProductsChart(new Map());
+    renderTopProductsTable(new Map());
   }
 }
 
 function renderLeaderboard(rows, classPL) {
   const tbody = $('leaderboard-tbody');
+  const emptyStats = () => ({ count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0, paidAmt: 0, lostAmt: 0 });
   const stats = new Map();
   for (const r of rows) {
     const key = r.rep || 'Unassigned';
-    const s = stats.get(key) || { count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0 };
+    const s = stats.get(key) || emptyStats();
     s.count++;
+    if (r.paid) s.paidAmt += r.amount;
     if (!r.paid) {
       s.openCount++;
       s.openBal += r.balance;
@@ -1093,25 +1144,27 @@ function renderLeaderboard(rows, classPL) {
         s.overdueCount++;
         s.overdueBal += r.balance;
       }
+      if (r.lost) s.lostAmt += r.balance;
     }
     stats.set(key, s);
   }
-  const empty = { count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0 };
   const combined = new Map();
   for (const [key, pl] of (classPL || new Map())) {
-    combined.set(key, { ...(stats.get(key) || empty), revenue: pl.income, cogs: pl.cogs });
+    combined.set(key, { ...(stats.get(key) || emptyStats()), revenue: pl.income, cogs: pl.cogs });
   }
   for (const [key, s] of stats) {
     if (!combined.has(key)) combined.set(key, { ...s, revenue: 0, cogs: 0 });
   }
   const sorted = [...combined.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
   if (!sorted.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
     return;
   }
   tbody.innerHTML = sorted.map(([name, agg], i) => {
     const gpDollars = agg.revenue - agg.cogs;
     const gpPct = agg.revenue > 0 ? (gpDollars / agg.revenue) * 100 : 0;
+    const closeDenom = agg.paidAmt + agg.lostAmt;
+    const closePct = closeDenom > 0 ? (agg.paidAmt / closeDenom) * 100 : null;
     const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
     const openCell = agg.openCount
       ? `<strong>${agg.openCount}</strong><div style="font-size:.75rem;color:var(--text2);">${fmt(agg.openBal)}</div>`
@@ -1119,6 +1172,10 @@ function renderLeaderboard(rows, classPL) {
     const overdueCell = agg.overdueCount
       ? `<strong style="color:var(--red);">${agg.overdueCount}</strong><div style="font-size:.75rem;color:var(--red);">${fmt(agg.overdueBal)}</div>`
       : '<span style="color:var(--text2);">—</span>';
+    const closeCell = closePct === null
+      ? '<span style="color:var(--text2);">—</span>'
+      : `<strong style="color:${closePct >= 90 ? 'var(--qb-green)' : closePct >= 70 ? 'var(--orange)' : 'var(--red)'};">${closePct.toFixed(1)}%</strong>` +
+        (agg.lostAmt > 0 ? `<div style="font-size:.72rem;color:var(--red);">${fmt(agg.lostAmt)} lost</div>` : '');
     return `
       <tr>
         <td class="leaderboard-rank ${i < 3 ? 'top' : ''}">${rank}</td>
@@ -1127,6 +1184,7 @@ function renderLeaderboard(rows, classPL) {
         <td>${fmt(agg.cogs)}</td>
         <td><strong style="color:var(--qb-green);">${fmt(gpDollars)}</strong></td>
         <td><strong>${pct(gpPct)}</strong></td>
+        <td title="Paid$ / (Paid$ + Lost$) — lost = invoice past due 90+ days">${closeCell}</td>
         <td>${openCell}</td>
         <td>${overdueCell}</td>
         <td style="color:var(--text2);">${agg.count}</td>
