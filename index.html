@@ -319,13 +319,13 @@
         </div>
         <div class="chart-card">
           <div class="chart-header">
-            <h3 id="rep-chart-title">Sales by Rep · 6 months</h3>
+            <h3 id="products-chart-title">Top Products · 6 months</h3>
             <div class="segmented view-toggle">
               <button data-mode="monthly" class="active">Month</button>
               <button data-mode="weekly">Week</button>
             </div>
           </div>
-          <canvas id="chart-rep"></canvas>
+          <canvas id="chart-products"></canvas>
         </div>
       </div>
 
@@ -545,7 +545,7 @@ function wireViewToggle() {
       _viewMode = btn.dataset.mode;
       syncViewToggleUI();
       const endDate = $('filter-end').value;
-      await Promise.all([loadRevenueChart(endDate), loadRepChart(endDate)]);
+      await Promise.all([loadRevenueChart(endDate), loadTopProducts(endDate)]);
     });
   });
   syncViewToggleUI();
@@ -554,7 +554,7 @@ function wireViewToggle() {
 function syncViewToggleUI() {
   document.querySelectorAll('.view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
   $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week · Mon–Sun' : 'Revenue by Month';
-  $('rep-chart-title').textContent = _viewMode === 'weekly' ? 'Sales by Rep · 8 weeks' : 'Sales by Rep · 6 months';
+  $('products-chart-title').textContent = _viewMode === 'weekly' ? 'Top Products · 8 weeks' : 'Top Products · 6 months';
 }
 
 function wireAttentionFilters() {
@@ -618,7 +618,14 @@ function loadDemoData() {
   populateInvoiceRepFilter(rows);
   renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
   renderStatusBreakdown(rows);
-  renderRepChartFromClassPL(demoClassPL);
+  const demoProducts = new Map([
+    ['Installation Service', { revenue: 184200, qty: 52, invoices: new Set() }],
+    ['Premium Flooring', { revenue: 142300, qty: 610, invoices: new Set() }],
+    ['Sub-floor Prep', { revenue: 98400, qty: 142, invoices: new Set() }],
+    ['Consultation', { revenue: 52275, qty: 38, invoices: new Set() }],
+    ['Materials Markup', { revenue: 31800, qty: 0, invoices: new Set() }],
+  ]);
+  renderTopProductsChart(demoProducts);
   renderLeaderboard(rows, demoClassPL);
   renderAttention(rows);
   renderPivot(rows);
@@ -1012,17 +1019,6 @@ function renderMiniDonut(canvasId, primary, secondary, color) {
   });
 }
 
-function renderRepChartFromClassPL(classPL) {
-  const byRep = new Map();
-  for (const [name, pl] of (classPL || new Map())) byRep.set(name, pl.income || 0);
-  const sorted = [...byRep.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
-  if (!sorted.length) {
-    renderBarChart('chart-rep', ['No data'], [0], 'Sales', '#6a59e5');
-  } else {
-    renderBarChart('chart-rep', sorted.map(e => e[0]), sorted.map(e => e[1]), 'Sales by Rep', '#6a59e5');
-  }
-}
-
 function monthlyRange(endDate) {
   const months = lastMonths(endDate, 6);
   return { start: months[0].start, end: months[months.length - 1].end };
@@ -1037,13 +1033,49 @@ function weeklyRange(endDate) {
   return { start: ymd(start), end: ymd(weekEnd) };
 }
 
-async function loadRepChart(endDate) {
+async function loadPeriodInvoices(endDate) {
   const range = _viewMode === 'weekly' ? weeklyRange(endDate) : monthlyRange(endDate);
   try {
-    const classPL = await loadClassPL(range.start, range.end);
-    renderRepChartFromClassPL(classPL);
+    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${range.start}' AND TxnDate <= '${range.end}' MAXRESULTS 1000`);
+    return data?.Invoice || [];
+  } catch { return []; }
+}
+
+function aggregateProducts(invoices) {
+  const byProduct = new Map();
+  for (const inv of invoices) {
+    for (const line of (inv.Line || [])) {
+      if (line.DetailType !== 'SalesItemLineDetail') continue;
+      const detail = line.SalesItemLineDetail;
+      if (!detail?.ItemRef?.value) continue;
+      const name = detail.ItemRef.name || 'Unknown';
+      const amount = Number(line.Amount) || 0;
+      const qty = Number(detail.Qty) || 0;
+      const agg = byProduct.get(name) || { revenue: 0, qty: 0, invoices: new Set() };
+      agg.revenue += amount;
+      agg.qty += qty;
+      agg.invoices.add(inv.Id);
+      byProduct.set(name, agg);
+    }
+  }
+  return byProduct;
+}
+
+function renderTopProductsChart(byProduct) {
+  const sorted = [...byProduct.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 10);
+  if (!sorted.length) {
+    renderBarChart('chart-products', ['No data'], [0], 'Revenue', '#6a59e5');
+  } else {
+    renderBarChart('chart-products', sorted.map(e => e[0]), sorted.map(e => e[1].revenue), 'Revenue', '#6a59e5');
+  }
+}
+
+async function loadTopProducts(endDate) {
+  try {
+    const invoices = await loadPeriodInvoices(endDate);
+    renderTopProductsChart(aggregateProducts(invoices));
   } catch {
-    renderRepChartFromClassPL(new Map());
+    renderTopProductsChart(new Map());
   }
 }
 
@@ -1258,7 +1290,7 @@ async function refreshDashboard() {
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadRevenueChart(endDate),
-    loadRepChart(endDate),
+    loadTopProducts(endDate),
     loadRepFilter(),
     (async () => {
       const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
