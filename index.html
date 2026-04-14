@@ -157,6 +157,15 @@
   tbody tr.needs-rep { background: #fff8e1; }
   tbody tr.needs-rep:hover { background: #fff3cd; }
   tbody tr.needs-items td:first-child { border-left: 3px solid var(--red); }
+  tbody tr.clickable { cursor: pointer; }
+  tbody tr.clickable:hover { background: var(--qb-light); }
+  tbody tr.needs-rep.clickable:hover { background: #ffe7a1; }
+
+  /* Clickable attention item */
+  a.attention-item { text-decoration: none; color: inherit; transition: transform .08s; }
+  a.attention-item:hover { transform: translateX(2px); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .qb-link-icon { font-size: .75rem; color: var(--qb-blue); margin-left: 6px; opacity: .6; }
+  a.attention-item:hover .qb-link-icon { opacity: 1; }
   .need-badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: .72rem; font-weight: 700; letter-spacing: .3px; background: var(--orange); color: #fff; }
   .need-badge.items { background: var(--red); }
 
@@ -518,6 +527,17 @@ function loadDemoData() {
   d.salesByRep.forEach(r => { repSelect.innerHTML += `<option value="${r.rep}">${r.rep}</option>`; });
 }
 
+function qbInvoiceUrl(id) {
+  if (!id) return null;
+  const base = `https://app.qbo.intuit.com/app/invoice?txnId=${encodeURIComponent(id)}`;
+  return realmId ? `${base}&companyId=${encodeURIComponent(realmId)}` : base;
+}
+
+function openInvoiceInQb(id) {
+  const url = qbInvoiceUrl(id);
+  if (url) window.open(url, '_blank', 'noopener');
+}
+
 function renderInvoicesTable(invoices) {
   const tbody = $('invoices-tbody');
   const countEl = $('invoices-count');
@@ -530,14 +550,17 @@ function renderInvoicesTable(invoices) {
     const classes = [];
     if (!inv.rep) classes.push('needs-rep');
     if (inv.missingItemData) classes.push('needs-items');
+    if (inv.id) classes.push('clickable');
     const repCell = inv.rep
       ? inv.rep
       : '<span class="need-badge">⚠ Needs Rep</span>';
     const docCell = inv.missingItemData
       ? `${inv.docNum || '—'} <span class="need-badge items" title="No product/item line — COGS cannot be computed">NO ITEMS</span>`
       : (inv.docNum || '—');
+    const onclick = inv.id ? `onclick="openInvoiceInQb('${inv.id}')"` : '';
+    const title = inv.id ? 'title="Click to open in QuickBooks"' : '';
     return `
-    <tr class="${classes.join(' ')}">
+    <tr class="${classes.join(' ')}" ${onclick} ${title}>
       <td>${inv.date || '—'}</td>
       <td>${docCell}</td>
       <td>${inv.customer || '—'}</td>
@@ -881,12 +904,15 @@ function renderAttention(rows) {
   }
   list.innerHTML = flags.slice(0, 50).map(f => {
     const cls = f.reasons.includes('Overdue') ? 'overdue' : f.reasons.includes('Missing rep') ? 'missing-rep' : '';
+    const url = qbInvoiceUrl(f.id);
+    const openTag = url ? `<a class="attention-item ${cls}" href="${url}" target="_blank" rel="noopener" title="Open in QuickBooks to fix">` : `<div class="attention-item ${cls}">`;
+    const closeTag = url ? '</a>' : '</div>';
     return `
-      <div class="attention-item ${cls}">
+      ${openTag}
         <div class="attention-reason">${f.reasons.join(' · ')}</div>
-        <div><strong>${f.docNum || '—'}</strong> · ${f.customer || 'No customer'} · ${f.date || ''}</div>
+        <div><strong>${f.docNum || '—'}</strong> · ${f.customer || 'No customer'} · ${f.date || ''}${url ? '<span class="qb-link-icon">↗ open in QB</span>' : ''}</div>
         <div style="font-weight:600;">${fmt(f.balance || f.amount)}</div>
-      </div>
+      ${closeTag}
     `;
   }).join('');
 }
