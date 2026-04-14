@@ -72,6 +72,17 @@
   .chart-card { background: var(--card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); }
   .chart-card h3 { font-size: .85rem; margin-bottom: 14px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
   .chart-card canvas { width: 100% !important; max-height: 260px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; }
+  .chart-header h3 { margin-bottom: 0; }
+
+  /* Segmented control */
+  .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .segmented button { background: transparent; border: none; color: var(--text2); padding: 4px 12px; font-size: .72rem; font-weight: 600; cursor: pointer; font-family: inherit; letter-spacing: .4px; text-transform: uppercase; transition: all .15s; }
+  .segmented button:hover { color: var(--text); }
+  .segmented button.active { background: var(--qb-blue); color: #0a090f; }
+
+  /* Attention filter chips */
+  .attention-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
 
   /* Table */
   .table-card { background: var(--card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); margin-bottom: 24px; }
@@ -296,7 +307,16 @@
 
       <!-- Charts -->
       <div class="charts-row">
-        <div class="chart-card"><h3>Revenue by Month</h3><canvas id="chart-revenue"></canvas></div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 id="revenue-chart-title">Revenue by Month</h3>
+            <div class="segmented" id="revenue-view-toggle">
+              <button data-mode="monthly" class="active">Month</button>
+              <button data-mode="weekly">Week</button>
+            </div>
+          </div>
+          <canvas id="chart-revenue"></canvas>
+        </div>
         <div class="chart-card"><h3>Sales by Rep</h3><canvas id="chart-rep"></canvas></div>
       </div>
 
@@ -361,6 +381,14 @@
       <div class="table-card">
         <h3 id="attention-heading">⚠️ Requires Attention</h3>
         <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Invoices flagged for: missing sales rep (Class), missing customer, overdue and unpaid, zero/negative total, or no product/item data (COGS can't be computed).</p>
+        <div class="attention-filters" id="attention-filters">
+          <button class="chip active" data-flag="">All</button>
+          <button class="chip" data-flag="Missing rep">Missing rep</button>
+          <button class="chip" data-flag="Missing customer">Missing customer</button>
+          <button class="chip" data-flag="Overdue">Overdue</button>
+          <button class="chip" data-flag="Zero/negative total">Zero/negative total</button>
+          <button class="chip" data-flag="No item data (COGS)">No item data</button>
+        </div>
         <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
       </div>
     </div>
@@ -463,6 +491,8 @@ function showDashboard() {
   wireChips();
   wirePivotDim();
   wireInvoiceFilters();
+  wireViewToggle();
+  wireAttentionFilters();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   const [s, e] = defaultDateRange();
@@ -497,6 +527,32 @@ function wireInvoiceFilters() {
   });
 }
 
+function wireViewToggle() {
+  document.querySelectorAll('#revenue-view-toggle button').forEach(btn => {
+    if (btn._wired) return;
+    btn._wired = true;
+    btn.addEventListener('click', async () => {
+      if (_viewMode === btn.dataset.mode) return;
+      _viewMode = btn.dataset.mode;
+      document.querySelectorAll('#revenue-view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
+      $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week (Mon–Sun)' : 'Revenue by Month';
+      await loadRevenueChart($('filter-end').value);
+    });
+  });
+}
+
+function wireAttentionFilters() {
+  document.querySelectorAll('#attention-filters .chip').forEach(chip => {
+    if (chip._wired) return;
+    chip._wired = true;
+    chip.addEventListener('click', () => {
+      _attentionFlag = chip.dataset.flag || null;
+      document.querySelectorAll('#attention-filters .chip').forEach(c => c.classList.toggle('active', c === chip));
+      renderAttention(_lastRows);
+    });
+  });
+}
+
 function showDemoDashboard() {
   isDemoMode = true;
   $('login-screen').classList.add('hidden');
@@ -514,6 +570,8 @@ function loadDemoData() {
   wireChips();
   wirePivotDim();
   wireInvoiceFilters();
+  wireViewToggle();
+  wireAttentionFilters();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
@@ -626,28 +684,18 @@ const valuePillPlugin = {
     const { ctx } = chart;
     const meta = chart.getDatasetMeta(0);
     if (!meta || !meta.data) return;
+    const bg = chart.data.datasets[0].backgroundColor;
+    const color = typeof bg === 'string' ? bg : '#28efce';
     ctx.save();
-    ctx.font = '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.font = '600 11px Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = color;
     meta.data.forEach((bar, i) => {
       const value = chart.data.datasets[0].data[i];
       if (!value) return;
       const label = '$' + Math.round(value).toLocaleString();
-      const textWidth = ctx.measureText(label).width;
-      const padX = 8, pillH = 18, radius = 9;
-      const x = bar.x;
-      const y = Math.max(bar.y - 6, pillH / 2 + 2);
-      const pillX = x - textWidth / 2 - padX;
-      const pillY = y - pillH;
-      const pillW = textWidth + padX * 2;
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(pillX, pillY, pillW, pillH, radius);
-      else ctx.rect(pillX, pillY, pillW, pillH);
-      ctx.fillStyle = '#28efce';
-      ctx.fill();
-      ctx.fillStyle = '#0a090f';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(label, x, pillY + pillH / 2 + 0.5);
+      ctx.fillText(label, bar.x, bar.y - 4);
     });
     ctx.restore();
   }
@@ -744,9 +792,63 @@ async function loadKPIs(startDate, endDate) {
   }
 }
 
-async function loadMonthlyRevenueChart(endDate) {
+let _viewMode = 'monthly'; // 'monthly' | 'weekly'
+
+async function loadWeeklyPL(endDate) {
+  const end = new Date(endDate);
+  // Find the Sunday that ends the selected week (Mon-Sun weeks)
+  const endDay = end.getDay(); // 0=Sun ... 6=Sat
+  const daysToSunday = endDay === 0 ? 0 : 7 - endDay;
+  const weekEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + daysToSunday);
+  // Start 8 weeks back on a Monday (6 days before the Sunday 8 weeks before weekEnd)
+  const weeks = 8;
+  const start = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate() - weeks * 7 + 1);
+  const startStr = ymd(start);
+  const endStr = ymd(weekEnd);
+
   try {
-    const data = await loadMonthlyPL(endDate);
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startStr}&end_date=${endStr}&summarize_column_by=Days`);
+    const cols = pl?.Columns?.Column || [];
+    const dayStarts = [];
+    for (let i = 1; i < cols.length; i++) {
+      const title = cols[i].ColTitle || '';
+      if (/^total$/i.test(title)) { dayStarts.push(null); continue; }
+      const md = cols[i].MetaData || [];
+      const s = md.find(m => m.Name === 'StartDate')?.Value;
+      dayStarts.push(s || null);
+    }
+    const rows = pl?.Rows?.Row || [];
+    const income = findPLSection(rows, ['Total Income']) || [];
+    const cogs = findPLSection(rows, ['Total Cost of Goods Sold']) || [];
+
+    const buckets = Array.from({ length: weeks }, (_, w) => {
+      const mon = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7);
+      return { monday: mon, income: 0, cogs: 0 };
+    });
+    dayStarts.forEach((ds, idx) => {
+      if (!ds) return;
+      const d = new Date(ds + 'T00:00:00');
+      const diffDays = Math.floor((d - start) / 86400000);
+      const w = Math.floor(diffDays / 7);
+      if (w >= 0 && w < buckets.length) {
+        buckets[w].income += Number(income[idx]) || 0;
+        buckets[w].cogs += Math.abs(Number(cogs[idx]) || 0);
+      }
+    });
+
+    return {
+      labels: buckets.map(b => 'Wk ' + b.monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+      income: buckets.map(b => b.income),
+      cogs: buckets.map(b => b.cogs),
+    };
+  } catch {
+    return { labels: [], income: [], cogs: [] };
+  }
+}
+
+async function loadRevenueChart(endDate) {
+  try {
+    const data = _viewMode === 'weekly' ? await loadWeeklyPL(endDate) : await loadMonthlyPL(endDate);
     renderBarChart('chart-revenue', data.labels, data.income, 'Revenue', '#28efce');
   } catch {
     renderBarChart('chart-revenue', ['No data'], [0], 'Revenue', '#28efce');
@@ -994,14 +1096,25 @@ function renderAttention(rows) {
     if (reasons.length) flags.push({ ...r, reasons });
   }
   flags.sort((a, b) => b.balance - a.balance);
+  // Count per flag for chip labels
+  const counts = { 'Missing rep': 0, 'Missing customer': 0, 'Overdue': 0, 'Zero/negative total': 0, 'No item data (COGS)': 0 };
+  for (const f of flags) for (const r of f.reasons) if (r in counts) counts[r]++;
+  document.querySelectorAll('#attention-filters .chip').forEach(chip => {
+    const flag = chip.dataset.flag;
+    const labelMap = { 'No item data (COGS)': 'No item data' };
+    const baseLabel = flag ? (labelMap[flag] || flag) : 'All';
+    const n = flag ? counts[flag] : flags.length;
+    chip.textContent = `${baseLabel} (${n})`;
+  });
+  const visible = _attentionFlag ? flags.filter(f => f.reasons.includes(_attentionFlag)) : flags;
   $('attention-heading').innerHTML = `⚠️ Requires Attention <span style="font-size:.8rem;color:var(--text2);font-weight:500;">(${flags.length})</span>`;
   const navCount = $('nav-attention-count');
   if (navCount) navCount.textContent = flags.length ? `(${flags.length})` : '';
-  if (!flags.length) {
-    list.innerHTML = '<div class="attention-empty">All clear — no flagged invoices in range.</div>';
+  if (!visible.length) {
+    list.innerHTML = `<div class="attention-empty">${_attentionFlag ? 'No invoices match this filter.' : 'All clear — no flagged invoices in range.'}</div>`;
     return;
   }
-  list.innerHTML = flags.slice(0, 50).map(f => {
+  list.innerHTML = visible.slice(0, 100).map(f => {
     const cls = f.reasons.includes('Overdue') ? 'overdue' : f.reasons.includes('Missing rep') ? 'missing-rep' : '';
     const url = qbInvoiceUrl(f.id);
     const openTag = url ? `<a class="attention-item ${cls}" href="${url}" target="_blank" rel="noopener" title="Open in QuickBooks to fix">` : `<div class="attention-item ${cls}">`;
@@ -1077,6 +1190,7 @@ function setQuickRange(kind) {
 
 // Cached rows for pivot dim changes without re-fetching
 let _lastRows = [];
+let _attentionFlag = null;
 
 async function loadClassPL(startDate, endDate) {
   const map = new Map();
@@ -1122,7 +1236,7 @@ async function refreshDashboard() {
 
   await Promise.all([
     loadKPIs(startDate, endDate),
-    loadMonthlyRevenueChart(endDate),
+    loadRevenueChart(endDate),
     loadRepFilter(),
     (async () => {
       const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
