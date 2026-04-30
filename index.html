@@ -213,6 +213,13 @@
   .attention-reason { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); font-weight: 600; }
   .attention-empty { padding: 20px; text-align: center; color: var(--text2); font-size: .9rem; }
 
+  /* Rep history strip */
+  .rep-history { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+  .rep-pip { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; font-size: .7rem; font-weight: 700; cursor: default; user-select: none; line-height: 1; }
+  .rep-pip.has-rep { background: rgba(116,231,154,.18); color: var(--qb-green); border: 1px solid rgba(116,231,154,.35); }
+  .rep-pip.no-rep { background: rgba(244,180,67,.16); color: var(--orange); border: 1px solid rgba(244,180,67,.4); }
+  .rep-history-empty { font-size: .7rem; color: var(--text2); margin-left: 6px; font-style: italic; }
+
   /* Inline rep editor */
   .rep-editor { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .rep-editor select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: .82rem; font-family: inherit; max-width: 180px; cursor: pointer; }
@@ -496,6 +503,7 @@
           </label>
         </div>
         <div class="table-actions">
+          <button id="auto-fill-reps" class="save-all-btn hidden" type="button" onclick="autoFillSuggestedReps()" style="background:transparent;color:var(--qb-blue);border:1px solid var(--qb-blue);">Auto-fill from history</button>
           <button id="save-all-reps" class="save-all-btn hidden" type="button" onclick="saveAllReps(this)">Save All</button>
         </div>
         <div class="table-wrap">
@@ -754,6 +762,7 @@ function loadDemoData() {
     dueDate: null,
   }));
   _lastRows = rows;
+  buildCustomerHistoryIdx(rows);
   const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
   populateInvoiceRepFilter(rows);
   renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
@@ -790,9 +799,10 @@ function attrEscape(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function renderRepEditor(invoiceId, currentName) {
+function renderRepEditor(invoice) {
+  const invoiceId = invoice.id;
   const dirty = _dirtyRows.get(invoiceId);
-  const displayName = dirty ? dirty.className : (currentName || '');
+  const displayName = dirty ? dirty.className : (invoice.rep || '');
   const needsRep = !displayName;
   const opts = ['<option value=""></option>'].concat(
     _classList.map(c => `<option value="${attrEscape(c.name)}"${c.name === displayName ? ' selected' : ''}>${attrEscape(c.name)}</option>`)
@@ -803,6 +813,7 @@ function renderRepEditor(invoiceId, currentName) {
       <select onchange="onRepChange(this)" aria-label="Sales rep" class="${needsRep ? 'needs-rep-select' : ''}">${opts}</select>
       <button type="button" class="save-row-btn ${dirty ? '' : 'hidden'}" onclick="saveRow('${idAttr}', this)">Save</button>
       <span class="row-save-status" aria-live="polite"></span>
+      ${renderRepHistory(invoice)}
     </div>
   `;
 }
@@ -822,7 +833,7 @@ function renderInvoicesTable(invoices) {
     if (inv.missingItemData) classes.push('needs-items');
     if (inv.id) classes.push('clickable');
     const repCell = inv.id
-      ? renderRepEditor(inv.id, inv.rep)
+      ? renderRepEditor(inv)
       : (inv.rep || '<span class="need-badge">Needs Rep</span>');
     const docCell = inv.missingItemData
       ? `${inv.docNum || '—'} <span class="need-badge items" title="No product/item line — COGS cannot be computed">NO ITEMS</span>`
@@ -906,6 +917,9 @@ async function saveRow(invoiceId, btn) {
     }
     row.rep = change.className;
     _dirtyRows.delete(invoiceId);
+    // Index already references the same row object, but rebuild order in case dates were edited elsewhere.
+    // Cheap rebuild keeps suggestions accurate for subsequent auto-fills.
+    buildCustomerHistoryIdx(_lastRows);
     btn.classList.add('hidden');
     btn.disabled = false;
     const sel = editor?.querySelector('select');
@@ -940,6 +954,40 @@ function updateSaveAllButton() {
     btn.classList.remove('hidden');
     btn.textContent = `Save All (${count})`;
   }
+  updateAutoFillButton();
+}
+
+function updateAutoFillButton() {
+  const btn = $('auto-fill-reps');
+  if (!btn) return;
+  let count = 0;
+  for (const r of _lastRows) {
+    if (r.rep) continue;
+    if (_dirtyRows.has(r.id)) continue;
+    if (suggestRepForInvoice(r)) count++;
+  }
+  if (count > 0) {
+    btn.classList.remove('hidden');
+    btn.textContent = `Auto-fill ${count} from history`;
+  } else {
+    btn.classList.add('hidden');
+  }
+}
+
+function autoFillSuggestedReps() {
+  let filled = 0;
+  for (const r of _lastRows) {
+    if (r.rep) continue;
+    if (_dirtyRows.has(r.id)) continue;
+    const suggested = suggestRepForInvoice(r);
+    if (!suggested) continue;
+    const cls = _classMap.get(suggested);
+    if (!cls) continue;
+    _dirtyRows.set(r.id, { classId: cls.id, className: suggested });
+    filled++;
+  }
+  if (filled > 0) applyInvoiceFilters();
+  updateSaveAllButton();
 }
 
 async function saveAllReps(btn) {
@@ -1175,6 +1223,57 @@ async function loadRevenueChart(endDate) {
 let _classMap = new Map(); // name → { id, name }
 let _classList = [];        // [{ id, name }] sorted by name
 let _dirtyRows = new Map(); // invoiceId → { classId, className }
+let _customerHistoryIdx = new Map(); // customer → rows sorted desc by date
+
+function buildCustomerHistoryIdx(rows) {
+  _customerHistoryIdx = new Map();
+  for (const r of rows) {
+    if (!r.customer) continue;
+    let list = _customerHistoryIdx.get(r.customer);
+    if (!list) { list = []; _customerHistoryIdx.set(r.customer, list); }
+    list.push(r);
+  }
+  for (const list of _customerHistoryIdx.values()) {
+    list.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }
+}
+
+function getCustomerHistory(invoice, max = 5) {
+  if (!invoice.customer) return [];
+  const list = _customerHistoryIdx.get(invoice.customer) || [];
+  const out = [];
+  for (const r of list) {
+    if (r.id === invoice.id) continue;
+    if (invoice.date && r.date && r.date >= invoice.date) continue;
+    out.push(r);
+    if (out.length === max) break;
+  }
+  return out.reverse(); // oldest left, newest right
+}
+
+function suggestRepForInvoice(invoice) {
+  if (!invoice.customer) return null;
+  const list = _customerHistoryIdx.get(invoice.customer) || [];
+  for (const r of list) {
+    if (r.id === invoice.id) continue;
+    if (invoice.date && r.date && r.date >= invoice.date) continue;
+    if (r.rep && _classMap.has(r.rep)) return r.rep;
+  }
+  return null;
+}
+
+function renderRepHistory(invoice) {
+  const history = getCustomerHistory(invoice, 5);
+  if (!history.length) return '<span class="rep-history-empty" title="No prior invoices for this customer in range">no prior</span>';
+  return '<span class="rep-history">' + history.map(r => {
+    const has = !!r.rep;
+    const letter = has ? (r.rep.trim().charAt(0).toUpperCase() || '?') : '—';
+    const tip = has
+      ? `${r.rep}  ·  ${r.docNum || r.id}  ·  ${r.date || ''}`
+      : `Missing rep  ·  ${r.docNum || r.id}  ·  ${r.date || ''}`;
+    return `<span class="rep-pip ${has ? 'has-rep' : 'no-rep'}" title="${attrEscape(tip)}" aria-label="${attrEscape(tip)}">${attrEscape(letter)}</span>`;
+  }).join('') + '</span>';
+}
 
 async function loadRepFilter() {
   try {
@@ -1852,6 +1951,7 @@ async function refreshDashboard() {
       const filteredRaw = productFilter ? rawInvoices.filter(inv => (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter)) : rawInvoices;
       const rows = buildRows(rawInvoices, paymentMap, repFilter, productFilter);
       _lastRows = rows;
+      buildCustomerHistoryIdx(rows);
       populateInvoiceRepFilter(rows);
       renderInvoiceActivityKpis(activity, rows);
       renderStatusBreakdown(rows);
