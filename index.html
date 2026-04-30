@@ -213,9 +213,30 @@
   .attention-reason { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); font-weight: 600; }
   .attention-empty { padding: 20px; text-align: center; color: var(--text2); font-size: .9rem; }
 
+  /* Inline rep editor */
+  .rep-editor { display: inline-flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .rep-editor select { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 5px 8px; font-size: .82rem; font-family: inherit; max-width: 180px; cursor: pointer; }
+  .rep-editor select.needs-rep-select { border-color: var(--orange); }
+  .save-row-btn { background: var(--qb-blue); color: #0a090f; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: .72rem; font-weight: 700; font-family: inherit; letter-spacing: .3px; transition: filter .15s; }
+  .save-row-btn:hover { filter: brightness(1.1); }
+  .save-row-btn:disabled { opacity: .55; cursor: wait; }
+  .row-save-status { font-size: .7rem; font-weight: 600; }
+  .row-save-status.saving { color: var(--text2); }
+  .row-save-status.saved { color: var(--qb-green); }
+  .row-save-status.failed { color: var(--red); }
+
+  /* Action bar above tables */
+  .table-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 10px; min-height: 36px; }
+  .save-all-btn { background: var(--qb-blue); color: #0a090f; border: none; padding: 8px 16px; min-height: 36px; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: inherit; font-size: .85rem; transition: filter .15s; }
+  .save-all-btn:hover { filter: brightness(1.1); }
+  .save-all-btn:disabled { opacity: .6; cursor: wait; }
+
   /* Pivot */
   .pivot-controls { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; font-size: .8rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; }
   .pivot-controls select { border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: .85rem; background: var(--surface-2); color: var(--text); font-family: inherit; text-transform: none; letter-spacing: 0; }
+  .pivot-scroll { max-height: 760px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .pivot-scroll table { border-collapse: separate; border-spacing: 0; }
+  .pivot-scroll thead th { position: sticky; top: 0; background: var(--card); z-index: 1; box-shadow: inset 0 -1px 0 var(--border); border-bottom: none; }
 
   /* Row-level warning for invoices needing attention */
   tbody tr.needs-rep { background: rgba(244,180,67,.06); }
@@ -444,7 +465,7 @@
             </select>
           </label>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap pivot-scroll">
           <table class="sortable-table" id="pivot-table">
             <thead><tr>
               <th data-sort="key" id="pivot-dim-header">Dimension</th>
@@ -473,6 +494,9 @@
           <label>Rep
             <select id="invoice-filter-rep"><option value="">All</option></select>
           </label>
+        </div>
+        <div class="table-actions">
+          <button id="save-all-reps" class="save-all-btn hidden" type="button" onclick="saveAllReps(this)">Save All</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -711,8 +735,13 @@ function loadDemoData() {
   $('kpi-margin-sub').textContent = 'Q1-Q2 2026';
   renderBarChart('chart-revenue', d.revenueByMonth.map(m => m.month), d.revenueByMonth.map(m => m.revenue), 'Revenue', '#28efce');
 
+  // Demo classes (reps) — populate the cache used by inline editor
+  _classList = d.salesByRep.map((r, i) => ({ id: 'demo-' + i, name: r.rep }));
+  _classMap = new Map(_classList.map(c => [c.name, c]));
+
   const rows = d.invoices.map(inv => ({
     id: inv.docNum,
+    syncToken: '0',
     date: inv.date,
     docNum: inv.docNum,
     customer: inv.customer,
@@ -757,12 +786,34 @@ function openInvoiceInQb(id) {
   if (url) window.open(url, '_blank', 'noopener');
 }
 
+function attrEscape(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderRepEditor(invoiceId, currentName) {
+  const dirty = _dirtyRows.get(invoiceId);
+  const displayName = dirty ? dirty.className : (currentName || '');
+  const needsRep = !displayName;
+  const opts = ['<option value=""></option>'].concat(
+    _classList.map(c => `<option value="${attrEscape(c.name)}"${c.name === displayName ? ' selected' : ''}>${attrEscape(c.name)}</option>`)
+  ).join('');
+  const idAttr = attrEscape(invoiceId);
+  return `
+    <div class="rep-editor" data-invoice-id="${idAttr}" onclick="event.stopPropagation()">
+      <select onchange="onRepChange(this)" aria-label="Sales rep" class="${needsRep ? 'needs-rep-select' : ''}">${opts}</select>
+      <button type="button" class="save-row-btn ${dirty ? '' : 'hidden'}" onclick="saveRow('${idAttr}', this)">Save</button>
+      <span class="row-save-status" aria-live="polite"></span>
+    </div>
+  `;
+}
+
 function renderInvoicesTable(invoices) {
   const tbody = $('invoices-tbody');
   const countEl = $('invoices-count');
   if (countEl) countEl.textContent = `(${invoices.length})`;
   if (!invoices.length) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices match</td></tr>';
+    updateSaveAllButton();
     return;
   }
   tbody.innerHTML = invoices.map(inv => {
@@ -770,9 +821,9 @@ function renderInvoicesTable(invoices) {
     if (!inv.rep) classes.push('needs-rep');
     if (inv.missingItemData) classes.push('needs-items');
     if (inv.id) classes.push('clickable');
-    const repCell = inv.rep
-      ? inv.rep
-      : '<span class="need-badge">Needs Rep</span>';
+    const repCell = inv.id
+      ? renderRepEditor(inv.id, inv.rep)
+      : (inv.rep || '<span class="need-badge">Needs Rep</span>');
     const docCell = inv.missingItemData
       ? `${inv.docNum || '—'} <span class="need-badge items" title="No product/item line — COGS cannot be computed">NO ITEMS</span>`
       : (inv.docNum || '—');
@@ -789,6 +840,120 @@ function renderInvoicesTable(invoices) {
       <td><span class="badge ${inv.status}">${(inv.status || '').toUpperCase()}</span></td>
     </tr>`;
   }).join('');
+  updateSaveAllButton();
+}
+
+function onRepChange(sel) {
+  const editor = sel.closest('.rep-editor');
+  if (!editor) return;
+  const invoiceId = editor.dataset.invoiceId;
+  const className = sel.value;
+  const row = _lastRows.find(r => r.id === invoiceId);
+  const cls = _classMap.get(className);
+  if (className && cls && className !== (row?.rep || '')) {
+    _dirtyRows.set(invoiceId, { classId: cls.id, className });
+  } else {
+    _dirtyRows.delete(invoiceId);
+  }
+  const saveBtn = editor.querySelector('.save-row-btn');
+  saveBtn.classList.toggle('hidden', !_dirtyRows.has(invoiceId));
+  const status = editor.querySelector('.row-save-status');
+  if (status) { status.textContent = ''; status.className = 'row-save-status'; }
+  sel.classList.toggle('needs-rep-select', !sel.value);
+  updateSaveAllButton();
+}
+
+async function postInvoiceClassUpdate(row, classId, className) {
+  const body = {
+    Id: row.id,
+    SyncToken: row.syncToken || '0',
+    sparse: true,
+    ClassRef: { value: classId, name: className }
+  };
+  const res = await fetch('/api/qb/invoice', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    const err = new Error(`Save failed (${res.status})`);
+    err.status = res.status;
+    err.detail = text;
+    throw err;
+  }
+  const data = await res.json();
+  return data.Invoice || data;
+}
+
+async function saveRow(invoiceId, btn) {
+  const change = _dirtyRows.get(invoiceId);
+  if (!change) return;
+  const row = _lastRows.find(r => r.id === invoiceId);
+  if (!row) return;
+  const editor = btn.closest('.rep-editor');
+  const status = editor?.querySelector('.row-save-status');
+  btn.disabled = true;
+  if (status) { status.textContent = 'Saving…'; status.className = 'row-save-status saving'; }
+
+  try {
+    if (isDemoMode) {
+      await new Promise(r => setTimeout(r, 250));
+    } else {
+      const updated = await postInvoiceClassUpdate(row, change.classId, change.className);
+      if (updated?.SyncToken) row.syncToken = updated.SyncToken;
+    }
+    row.rep = change.className;
+    _dirtyRows.delete(invoiceId);
+    btn.classList.add('hidden');
+    btn.disabled = false;
+    const sel = editor?.querySelector('select');
+    if (sel) sel.classList.remove('needs-rep-select');
+    if (status) {
+      status.textContent = 'Saved';
+      status.className = 'row-save-status saved';
+      setTimeout(() => { if (status.classList.contains('saved')) { status.textContent = ''; status.className = 'row-save-status'; } }, 2000);
+    }
+    // Update parent row class so the orange "needs rep" highlight clears
+    const tr = editor?.closest('tr');
+    if (tr) tr.classList.remove('needs-rep');
+  } catch (e) {
+    btn.disabled = false;
+    if (status) {
+      status.textContent = e.status === 409 ? 'Conflict — refresh' : 'Failed';
+      status.className = 'row-save-status failed';
+      status.title = e.detail || e.message || 'Save failed';
+    }
+  }
+  updateSaveAllButton();
+}
+
+function updateSaveAllButton() {
+  const btn = $('save-all-reps');
+  if (!btn) return;
+  const count = _dirtyRows.size;
+  if (count === 0) {
+    btn.classList.add('hidden');
+    btn.textContent = 'Save All';
+  } else {
+    btn.classList.remove('hidden');
+    btn.textContent = `Save All (${count})`;
+  }
+}
+
+async function saveAllReps(btn) {
+  if (!_dirtyRows.size) return;
+  btn.disabled = true;
+  const initial = _dirtyRows.size;
+  btn.textContent = `Saving ${initial}…`;
+  const ids = [..._dirtyRows.keys()];
+  await Promise.allSettled(ids.map(id => {
+    const rowBtn = document.querySelector(`.rep-editor[data-invoice-id="${CSS.escape(id)}"] .save-row-btn`);
+    return rowBtn ? saveRow(id, rowBtn) : Promise.resolve();
+  }));
+  btn.disabled = false;
+  updateSaveAllButton();
 }
 
 function applyInvoiceFilters() {
@@ -1007,16 +1172,27 @@ async function loadRevenueChart(endDate) {
   }
 }
 
+let _classMap = new Map(); // name → { id, name }
+let _classList = [];        // [{ id, name }] sorted by name
+let _dirtyRows = new Map(); // invoiceId → { classId, className }
+
 async function loadRepFilter() {
   try {
     const data = await qbQuery(`SELECT * FROM Class MAXRESULTS 50`);
     const repSelect = $('filter-rep');
     const current = repSelect.value;
     repSelect.innerHTML = '<option value="">All</option>';
+    _classMap.clear();
+    _classList = [];
     (data?.Class || []).forEach(c => {
       const name = c.FullyQualifiedName || c.Name;
-      if (name) repSelect.innerHTML += `<option value="${name}">${name}</option>`;
+      if (!name) return;
+      repSelect.innerHTML += `<option value="${name}">${name}</option>`;
+      const entry = { id: c.Id, name };
+      _classMap.set(name, entry);
+      _classList.push(entry);
     });
+    _classList.sort((a, b) => a.name.localeCompare(b.name));
     if (current) repSelect.value = current;
   } catch {}
 }
@@ -1112,6 +1288,7 @@ function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
       const missingItemData = total > 0 && productLinesWithItem.length === 0;
       return {
         id: inv.Id,
+        syncToken: inv.SyncToken,
         date: inv.TxnDate,
         docNum: inv.DocNumber,
         customer: inv.CustomerRef?.name || null,
@@ -1662,13 +1839,15 @@ async function refreshDashboard() {
   const paymentsFetch = loadPaymentMap(startDate, endDate);
   const classPLFetch = loadClassPL(startDate, endDate);
   const activityFetch = loadInvoiceActivity();
+  const repFilterFetch = loadRepFilter();
 
   await Promise.all([
     loadKPIs(startDate, endDate),
     loadRevenueChart(endDate),
-    loadRepFilter(),
     populateProductFilter(),
     (async () => {
+      // Wait for class list before rendering invoice rows so the rep dropdown is populated.
+      await repFilterFetch;
       const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
       const filteredRaw = productFilter ? rawInvoices.filter(inv => (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter)) : rawInvoices;
       const rows = buildRows(rawInvoices, paymentMap, repFilter, productFilter);
