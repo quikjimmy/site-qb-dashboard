@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <style>
   :root {
     --qb-blue: #28efce;
@@ -22,15 +22,23 @@
     --red: #fb7c4f;
     --orange: #f4b443;
     --purple: #6a59e5;
+
+    /* Semantic aliases — use these in new code */
+    --accent: var(--qb-blue);
+    --on-accent: #0a090f;
+    --success: var(--qb-green);
+    --warning: var(--orange);
+    --danger: var(--red);
+    --info: var(--purple);
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100dvh; -webkit-font-smoothing: antialiased; }
   .topbar { background: #0a090f; color: var(--text); padding: 4px 10px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
   .topbar .brand { display: flex; align-items: center; gap: 14px; }
-  .topbar .brand img { height: 56px; width: auto; display: block; }
+  .topbar .brand img { height: 56px; width: auto; display: block; aspect-ratio: 1 / 1; }
   .topbar h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .2px; }
   .topbar .status { font-size: .8rem; color: var(--text2); }
-  .topbar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: .8rem; font-weight: 500; transition: all .15s; font-family: inherit; }
+  .topbar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 8px 14px; min-height: 36px; border-radius: 6px; cursor: pointer; font-size: .8rem; font-weight: 500; transition: border-color .15s, color .15s, background .15s; font-family: inherit; }
   .topbar button:hover { border-color: var(--qb-blue); color: var(--qb-blue); }
   .topbar button.danger { border-color: rgba(251,124,79,.4); color: var(--red); }
   .topbar button.danger:hover { border-color: var(--red); background: rgba(251,124,79,.08); }
@@ -58,13 +66,30 @@
   .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
   .kpi-card { background: var(--card); border-radius: 8px; padding: 20px; border: 1px solid var(--border); transition: border-color .15s; }
   .kpi-card:hover { border-color: #35353f; }
-  .kpi-card .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 8px; font-weight: 500; }
-  .kpi-card .value { font-size: 1.75rem; font-weight: 600; letter-spacing: -.5px; }
+  .kpi-card .label { font-size: .75rem; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 8px; font-weight: 500; }
+  .kpi-card .value { font-size: 1.75rem; font-weight: 600; letter-spacing: -.5px; font-variant-numeric: tabular-nums; }
   .kpi-card .sub { font-size: .8rem; color: var(--text2); margin-top: 4px; font-variant-numeric: tabular-nums; }
   .kpi-card.revenue .value { color: var(--qb-blue); }
   .kpi-card.cogs .value { color: var(--red); }
   .kpi-card.profit .value { color: var(--qb-green); }
   .kpi-card.margin .value { color: var(--orange); }
+  .kpi-card.headline { grid-column: span 2; background: linear-gradient(135deg, rgba(116,231,154,.08), rgba(40,239,206,.04)); border-color: rgba(116,231,154,.25); }
+  .kpi-card.headline .value { font-size: 2.4rem; }
+  .kpi-card.headline .label { color: var(--qb-green); letter-spacing: .8px; }
+
+  /* Compact activity strip */
+  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; padding: 14px 18px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+  .kpi-strip .item { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; border-right: 1px solid var(--border); }
+  .kpi-strip .item:last-child { border-right: none; }
+  .kpi-strip .item:first-child { padding-left: 0; }
+  .kpi-strip .label { font-size: .68rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); font-weight: 500; }
+  .kpi-strip .value { font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .kpi-strip .sub { font-size: .72rem; color: var(--text2); font-variant-numeric: tabular-nums; }
+  @media (max-width: 700px) {
+    .kpi-strip { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+    .kpi-strip .item { border-right: none; padding: 0; }
+    .kpi-card.headline { grid-column: span 1; }
+  }
 
   /* Charts */
   .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
@@ -77,7 +102,7 @@
 
   /* Segmented control */
   .segmented { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
-  .segmented button { background: transparent; border: none; color: var(--text2); padding: 4px 12px; font-size: .72rem; font-weight: 600; cursor: pointer; font-family: inherit; letter-spacing: .4px; text-transform: uppercase; transition: all .15s; }
+  .segmented button { background: transparent; border: none; color: var(--text2); padding: 8px 14px; min-height: 36px; font-size: .72rem; font-weight: 600; cursor: pointer; font-family: inherit; letter-spacing: .4px; text-transform: uppercase; transition: color .15s, background .15s; }
   .segmented button:hover { color: var(--text); }
   .segmented button.active { background: var(--qb-blue); color: #0a090f; }
 
@@ -107,7 +132,9 @@
   .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--qb-blue); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   .loading-overlay { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 60px 0; color: var(--text2); font-size: .9rem; }
-  .error-msg { background: rgba(251,124,79,.08); color: var(--red); padding: 14px 18px; border-radius: 6px; border: 1px solid rgba(251,124,79,.25); margin-bottom: 20px; font-size: .9rem; }
+  .error-msg { background: rgba(251,124,79,.08); color: var(--red); padding: 14px 18px; border-radius: 6px; border: 1px solid rgba(251,124,79,.25); margin-bottom: 20px; font-size: .9rem; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .error-msg button { background: var(--red); color: #0a090f; border: none; padding: 8px 16px; min-height: 36px; border-radius: 6px; cursor: pointer; font-weight: 600; font-family: inherit; font-size: .85rem; transition: filter .15s; }
+  .error-msg button:hover { filter: brightness(1.1); }
 
   /* Responsive */
   @media (max-width: 900px) {
@@ -124,16 +151,26 @@
 
   .hidden { display: none !important; }
 
+  /* Visually hidden but accessible to screen readers */
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
   /* Page nav tabs */
   .page-nav { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--border); }
-  .page-nav button { background: none; border: none; padding: 10px 18px; font-size: .85rem; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; letter-spacing: .2px; }
+  .page-nav button { background: none; border: none; padding: 12px 18px; min-height: 44px; font-size: .85rem; font-weight: 500; color: var(--text2); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; font-family: inherit; letter-spacing: .2px; transition: color .15s; }
   .page-nav button:hover { color: var(--text); }
   .page-nav button.active { color: var(--qb-blue); border-bottom-color: var(--qb-blue); font-weight: 600; }
 
   /* Collapsible */
   details.table-card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
   details.table-card > summary::-webkit-details-marker { display: none; }
-  details.table-card > summary::after { content: '▸'; font-size: .8rem; color: var(--text2); transition: transform .15s; }
+  details.table-card > summary::after {
+    content: '';
+    width: 14px; height: 14px;
+    background-color: var(--text2);
+    -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>") no-repeat center / contain;
+    mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>") no-repeat center / contain;
+    transition: transform .15s;
+  }
   details.table-card[open] > summary::after { transform: rotate(90deg); }
   details.table-card > summary h3 { margin-bottom: 0; }
 
@@ -143,7 +180,7 @@
 
   /* Quick filter chips */
   .chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
-  .chip { background: transparent; border: 1px solid var(--border); color: var(--text2); padding: 6px 14px; border-radius: 999px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: all .15s; font-family: inherit; letter-spacing: .2px; }
+  .chip { background: transparent; border: 1px solid var(--border); color: var(--text2); padding: 10px 16px; min-height: 40px; border-radius: 999px; font-size: .8rem; font-weight: 500; cursor: pointer; transition: border-color .15s, color .15s, background .15s; font-family: inherit; letter-spacing: .2px; display: inline-flex; align-items: center; }
   .chip:hover { border-color: var(--qb-blue); color: var(--qb-blue); }
   .chip.active { background: var(--qb-blue); border-color: var(--qb-blue); color: #0a090f; }
 
@@ -210,13 +247,47 @@
   @media (max-width: 1100px) and (min-width: 901px) {
     .status-grid { grid-template-columns: repeat(2, 1fr); }
   }
+
+  /* Icons (Lucide-style) */
+  .icon { display: inline-block; width: 1em; height: 1em; vertical-align: -.125em; flex-shrink: 0; }
+  .icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .icon.filled svg { fill: currentColor; stroke: none; }
+  .heading-icon { color: var(--qb-blue); margin-right: 8px; vertical-align: -.18em; }
+  h3 .heading-icon { font-size: 1em; }
+
+  /* Status dot */
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .status-dot.connected { background: var(--qb-green); box-shadow: 0 0 8px rgba(116,231,154,.5); }
+  .status-dot.demo { background: var(--orange); box-shadow: 0 0 8px rgba(244,180,67,.5); }
+
+  /* Rank medals */
+  .rank-medal { font-weight: 700; }
+  .rank-medal.gold { color: #f4b443; }
+  .rank-medal.silver { color: #b8b8c0; }
+  .rank-medal.bronze { color: #cd7f32; }
+
+  /* Focus visible (a11y) */
+  :focus { outline: none; }
+  :focus-visible { outline: 2px solid var(--qb-blue); outline-offset: 2px; border-radius: 4px; }
+  .filters input:focus-visible, .filters select:focus-visible,
+  .invoice-filter-bar select:focus-visible, .pivot-controls select:focus-visible {
+    outline: 2px solid var(--qb-blue); outline-offset: 1px; border-color: var(--qb-blue);
+  }
+  button:focus-visible, .chip:focus-visible, a:focus-visible { outline: 2px solid var(--qb-blue); outline-offset: 2px; }
+  .sortable-table thead th:focus-visible { outline: 2px solid var(--qb-blue); outline-offset: -2px; }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    .spinner { animation: none; border-top-color: var(--text2); }
+  }
 </style>
 </head>
 <body>
 
 <div class="topbar">
   <div class="brand">
-    <img src="/assets/tch_white_v3.avif" alt="Ops Hub">
+    <img src="/assets/tch_white_v3.avif" alt="Ops Hub" width="56" height="56">
     <h1>Ops Hub</h1>
   </div>
   <div id="topbar-right">
@@ -228,7 +299,7 @@
 <div class="container">
   <!-- LOGIN SCREEN -->
   <div id="login-screen" class="login-screen">
-    <img class="logo" src="/assets/tch_white_v3.avif" alt="Ops Hub">
+    <img class="logo" src="/assets/tch_white_v3.avif" alt="Ops Hub" width="120" height="120">
     <h2>Connect to QuickBooks</h2>
     <p>Authorize this dashboard to read your QuickBooks Online company data. Only read-only access is requested.</p>
     <button class="qb-btn" onclick="startOAuth()">
@@ -236,7 +307,10 @@
       Connect with QuickBooks
     </button>
     <p style="margin-top:24px;font-size:.85rem;color:var(--text2);">Or view demo data (sample):</p>
-    <button onclick="showDemoDashboard()" style="background:#fff;border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:6px;cursor:pointer;font-size:.9rem;margin-top:8px;">📊 View Demo Data</button>
+    <button onclick="showDemoDashboard()" style="background:#fff;border:1px solid var(--border);color:#0a090f;padding:10px 20px;border-radius:6px;cursor:pointer;font-size:.9rem;margin-top:8px;display:inline-flex;align-items:center;gap:8px;">
+      <span class="icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg></span>
+      View Demo Data
+    </button>
     <p style="margin-top:16px;font-size:.78rem;color:var(--text2);">Your data is secured via server-side OAuth. No tokens stored in browser.</p>
   </div>
 
@@ -268,20 +342,20 @@
 
     <!-- PAGE: Dashboard -->
     <div id="page-dashboard">
-      <!-- Invoice Activity KPIs -->
+      <!-- Financial KPIs (headline + supporting) -->
       <div class="kpi-grid">
-        <div class="kpi-card profit"><div class="label">Invoices Created Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
-        <div class="kpi-card revenue"><div class="label">Invoices This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
-        <div class="kpi-card margin"><div class="label">Invoices This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
-        <div class="kpi-card cogs"><div class="label">Invoices In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
-      </div>
-
-      <!-- Financial KPIs -->
-      <div class="kpi-grid">
+        <div class="kpi-card profit headline"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
         <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
         <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
-        <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
         <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
+      </div>
+
+      <!-- Invoice activity strip (secondary metrics) -->
+      <div class="kpi-strip" aria-label="Invoice activity">
+        <div class="item"><div class="label">Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
+        <div class="item"><div class="label">This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
+        <div class="item"><div class="label">This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
+        <div class="item"><div class="label">In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
       </div>
 
       <!-- Status breakdown -->
@@ -292,7 +366,7 @@
             <div class="value" id="status-open-amt">—</div>
             <div class="sub" id="status-open-sub">—</div>
           </div>
-          <div class="right"><canvas id="chart-status-open"></canvas></div>
+          <div class="right"><canvas id="chart-status-open" role="img" aria-label="Open invoices share"></canvas></div>
         </div>
         <div class="status-card overdue">
           <div class="left">
@@ -300,7 +374,7 @@
             <div class="value" id="status-overdue-amt">—</div>
             <div class="sub" id="status-overdue-sub">—</div>
           </div>
-          <div class="right"><canvas id="chart-status-overdue"></canvas></div>
+          <div class="right"><canvas id="chart-status-overdue" role="img" aria-label="Overdue invoices share"></canvas></div>
         </div>
         <div class="status-card paid">
           <div class="left">
@@ -308,7 +382,7 @@
             <div class="value" id="status-paid-amt">—</div>
             <div class="sub" id="status-paid-sub">—</div>
           </div>
-          <div class="right"><canvas id="chart-status-paid"></canvas></div>
+          <div class="right"><canvas id="chart-status-paid" role="img" aria-label="Paid invoices share"></canvas></div>
         </div>
       </div>
 
@@ -317,18 +391,19 @@
         <div class="chart-card">
           <div class="chart-header">
             <h3 id="revenue-chart-title">Revenue by Month</h3>
-            <div class="segmented view-toggle">
-              <button data-mode="monthly" class="active">Month</button>
-              <button data-mode="weekly">Week</button>
+            <div class="segmented view-toggle" role="group" aria-label="Revenue time scale">
+              <button data-mode="monthly" class="active" aria-pressed="true">Month</button>
+              <button data-mode="weekly" aria-pressed="false">Week</button>
             </div>
           </div>
-          <canvas id="chart-revenue"></canvas>
+          <canvas id="chart-revenue" role="img" aria-label="Revenue chart" aria-describedby="chart-revenue-desc"></canvas>
+          <table class="sr-only" id="chart-revenue-desc"><caption>Revenue data table</caption><thead><tr><th>Period</th><th>Revenue</th></tr></thead><tbody></tbody></table>
         </div>
       </div>
 
       <!-- Leaderboard -->
       <div class="table-card">
-        <h3>🏆 Sales Rep Leaderboard</h3>
+        <h3><span class="icon heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></span>Sales Rep Leaderboard</h3>
         <div class="table-wrap">
           <table>
             <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th title="Paid$ / (Paid$ + Lost$) — lost = 90+ days overdue">Close %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
@@ -344,15 +419,17 @@
           <table class="sortable-table" id="products-table">
             <thead><tr>
               <th data-sort="name">Product</th>
-              <th data-sort="revenue" class="sort-active">Gross Revenue <span class="sort-ind">▼</span></th>
+              <th data-sort="revenue" class="sort-active">Gross Revenue <span class="sort-ind" aria-hidden="true">↓</span></th>
               <th data-sort="cogs">COGS</th>
               <th data-sort="gp">GP $</th>
               <th data-sort="gpPct">GP %</th>
               <th data-sort="qty">Units</th>
             </tr></thead>
             <tbody id="products-tbody"><tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+            <tbody id="products-tbody-rest" class="hidden"></tbody>
           </table>
         </div>
+        <button id="products-show-all" class="hidden" type="button" onclick="toggleProductsShowAll()" style="margin-top:12px;background:transparent;border:1px solid var(--border);color:var(--text2);padding:8px 16px;min-height:36px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:500;transition:border-color .15s,color .15s;">Show all</button>
       </div>
 
       <!-- Pivot table -->
@@ -368,8 +445,14 @@
           </label>
         </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th id="pivot-dim-header">Dimension</th><th>Invoices</th><th>Total $</th><th>Avg $</th><th>Open $</th></tr></thead>
+          <table class="sortable-table" id="pivot-table">
+            <thead><tr>
+              <th data-sort="key" id="pivot-dim-header">Dimension</th>
+              <th data-sort="count">Invoices</th>
+              <th data-sort="total" class="sort-active">Total $ <span class="sort-ind" aria-hidden="true">↓</span></th>
+              <th data-sort="avg">Avg $</th>
+              <th data-sort="open">Open $</th>
+            </tr></thead>
             <tbody id="pivot-tbody"><tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
@@ -403,7 +486,7 @@
     <!-- PAGE: Requires Attention -->
     <div id="page-attention" class="hidden">
       <div class="table-card">
-        <h3 id="attention-heading">⚠️ Requires Attention</h3>
+        <h3 id="attention-heading"><span class="icon heading-icon" style="color:var(--orange);" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>Requires Attention</h3>
         <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Invoices flagged for: missing sales rep (Class), missing customer, overdue and unpaid, zero/negative total, or no product/item data (COGS can't be computed).</p>
         <div class="attention-filters" id="attention-filters">
           <button class="chip active" data-flag="">All</button>
@@ -469,8 +552,10 @@ function defaultDateRange() {
 
 function showError(msg) {
   let el = document.querySelector('.error-msg');
-  if (!el) { el = document.createElement('div'); el.className = 'error-msg'; $('dashboard').prepend(el); }
-  el.textContent = msg; el.classList.remove('hidden');
+  if (!el) { el = document.createElement('div'); el.className = 'error-msg'; el.setAttribute('role', 'alert'); $('dashboard').prepend(el); }
+  el.innerHTML = `<span></span><button type="button" onclick="refreshDashboard()">Retry</button>`;
+  el.firstElementChild.textContent = msg;
+  el.classList.remove('hidden');
 }
 function clearError() { document.querySelectorAll('.error-msg').forEach(e => e.remove()); }
 
@@ -510,15 +595,17 @@ function showDashboard() {
   $('login-screen').classList.add('hidden');
   $('dashboard').classList.remove('hidden');
   $('conn-status').classList.remove('hidden');
-  $('conn-status').textContent = '🟢 Connected';
+  $('conn-status').innerHTML = '<span class="status-dot connected" aria-hidden="true"></span>Connected';
   $('logout-btn').classList.remove('hidden');
   wireChips();
   wirePivotDim();
+  wirePivotSort();
   wireInvoiceFilters();
   wireViewToggle();
   wireAttentionFilters();
   wireProductSort();
   wireProductFilter();
+  wireLeaderboardClick();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   const [s, e] = defaultDateRange();
@@ -569,7 +656,11 @@ function wireViewToggle() {
 }
 
 function syncViewToggleUI() {
-  document.querySelectorAll('.view-toggle button').forEach(b => b.classList.toggle('active', b.dataset.mode === _viewMode));
+  document.querySelectorAll('.view-toggle button').forEach(b => {
+    const active = b.dataset.mode === _viewMode;
+    b.classList.toggle('active', active);
+    b.setAttribute('aria-pressed', String(active));
+  });
   $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week · Mon–Sun' : 'Revenue by Month';
 }
 
@@ -590,7 +681,7 @@ function showDemoDashboard() {
   $('login-screen').classList.add('hidden');
   $('dashboard').classList.remove('hidden');
   $('conn-status').classList.remove('hidden');
-  $('conn-status').textContent = '🟡 Demo Mode (sample data)';
+  $('conn-status').innerHTML = '<span class="status-dot demo" aria-hidden="true"></span>Demo Mode (sample data)';
   $('logout-btn').classList.remove('hidden');
   $('filter-start').value = '2026-01-01';
   $('filter-end').value = '2026-04-13';
@@ -601,11 +692,13 @@ function loadDemoData() {
   const d = DEMO_DATA;
   wireChips();
   wirePivotDim();
+  wirePivotSort();
   wireInvoiceFilters();
   wireViewToggle();
   wireAttentionFilters();
   wireProductSort();
   wireProductFilter();
+  wireLeaderboardClick();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
@@ -679,7 +772,7 @@ function renderInvoicesTable(invoices) {
     if (inv.id) classes.push('clickable');
     const repCell = inv.rep
       ? inv.rep
-      : '<span class="need-badge">⚠ Needs Rep</span>';
+      : '<span class="need-badge">Needs Rep</span>';
     const docCell = inv.missingItemData
       ? `${inv.docNum || '—'} <span class="need-badge items" title="No product/item line — COGS cannot be computed">NO ITEMS</span>`
       : (inv.docNum || '—');
@@ -750,6 +843,24 @@ function renderBarChart(canvasId, labels, values, label, color) {
     options: { responsive: true, maintainAspectRatio: false, layout: { padding: { top: 22 } }, plugins: { legend: { display: false }, tooltip: { enabled: true } }, scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v.toLocaleString() } } } },
     plugins: [valuePillPlugin]
   });
+  updateChartA11y(canvasId, label, labels, values);
+}
+
+function updateChartA11y(canvasId, label, labels, values) {
+  const canvas = $(canvasId);
+  if (!canvas) return;
+  const total = values.reduce((s, v) => s + (Number(v) || 0), 0);
+  const max = values.length ? Math.max(...values) : 0;
+  const maxIdx = values.indexOf(max);
+  const summary = labels.length
+    ? `${label} by period. ${labels.length} data points totaling $${Math.round(total).toLocaleString()}. Highest: ${labels[maxIdx]} at $${Math.round(max).toLocaleString()}.`
+    : `${label}: no data.`;
+  canvas.setAttribute('aria-label', summary);
+  const tableId = canvas.getAttribute('aria-describedby');
+  if (tableId) {
+    const tbody = document.querySelector(`#${tableId} tbody`);
+    if (tbody) tbody.innerHTML = labels.map((l, i) => `<tr><td>${l}</td><td>${fmt(values[i])}</td></tr>`).join('');
+  }
 }
 
 function renderLineChart(canvasId, labels, rev, cogs) {
@@ -1139,9 +1250,13 @@ function productRowValue(name, agg, col) {
   return 0;
 }
 
+let _productsShowAll = false;
+
 function renderTopProductsTable(byProduct) {
   _lastProductAgg = byProduct;
   const tbody = $('products-tbody');
+  const tbodyRest = $('products-tbody-rest');
+  const showAllBtn = $('products-show-all');
   const entries = [...byProduct.entries()];
   const { col, dir } = _productSort;
   entries.sort((a, b) => {
@@ -1163,14 +1278,16 @@ function renderTopProductsTable(byProduct) {
       th.appendChild(document.createTextNode(' '));
       th.appendChild(span);
     }
-    th.querySelector('.sort-ind').textContent = dir === 'asc' ? '▲' : '▼';
+    th.querySelector('.sort-ind').textContent = dir === 'asc' ? '↑' : '↓';
   });
   if (!entries.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No paid invoices with product lines in this range</td></tr>';
+    if (tbodyRest) tbodyRest.innerHTML = '';
+    if (showAllBtn) showAllBtn.classList.add('hidden');
     return;
   }
   const dash = '<span style="color:var(--text2);">—</span>';
-  tbody.innerHTML = entries.slice(0, 100).map(([name, agg]) => {
+  const renderRow = ([name, agg]) => {
     const gp = agg.revenue - agg.cogs;
     const gpPct = agg.revenue > 0 ? (gp / agg.revenue) * 100 : 0;
     return `
@@ -1183,7 +1300,26 @@ function renderTopProductsTable(byProduct) {
         <td style="color:var(--text2);">${agg.qty || dash}</td>
       </tr>
     `;
-  }).join('');
+  };
+  const top = entries.slice(0, 10);
+  const rest = entries.slice(10, 100);
+  tbody.innerHTML = top.map(renderRow).join('');
+  if (tbodyRest) tbodyRest.innerHTML = rest.map(renderRow).join('');
+  if (showAllBtn) {
+    if (rest.length) {
+      showAllBtn.classList.remove('hidden');
+      showAllBtn.textContent = _productsShowAll ? 'Show top 10' : `Show all (${entries.length})`;
+      tbodyRest?.classList.toggle('hidden', !_productsShowAll);
+    } else {
+      showAllBtn.classList.add('hidden');
+      tbodyRest?.classList.add('hidden');
+    }
+  }
+}
+
+function toggleProductsShowAll() {
+  _productsShowAll = !_productsShowAll;
+  renderTopProductsTable(_lastProductAgg);
 }
 
 async function loadTopProducts(rawInvoices) {
@@ -1212,6 +1348,17 @@ function wireProductFilter() {
   if (sel && !sel._wired) {
     sel._wired = true;
     sel.addEventListener('change', refreshDashboard);
+  }
+}
+
+function wireLeaderboardClick() {
+  const tbody = $('leaderboard-tbody');
+  if (tbody && !tbody._wired) {
+    tbody._wired = true;
+    tbody.addEventListener('click', e => {
+      const tr = e.target.closest('tr[data-rep]');
+      if (tr) filterByRep(tr.dataset.rep);
+    });
   }
 }
 
@@ -1252,7 +1399,8 @@ function renderLeaderboard(rows, classPL) {
     const gpPct = agg.revenue > 0 ? (gpDollars / agg.revenue) * 100 : 0;
     const closeDenom = agg.paidAmt + agg.lostAmt;
     const closePct = closeDenom > 0 ? (agg.paidAmt / closeDenom) * 100 : null;
-    const rank = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '#' + (i + 1);
+    const medalClass = i === 0 ? 'gold' : i === 1 ? 'silver' : i === 2 ? 'bronze' : '';
+    const rank = `<span class="rank-medal ${medalClass}">#${i + 1}</span>`;
     const openCell = agg.openCount
       ? `<strong>${agg.openCount}</strong><div style="font-size:.75rem;color:var(--text2);">${fmt(agg.openBal)}</div>`
       : '<span style="color:var(--text2);">—</span>';
@@ -1263,8 +1411,12 @@ function renderLeaderboard(rows, classPL) {
       ? '<span style="color:var(--text2);">—</span>'
       : `<strong style="color:${closePct >= 90 ? 'var(--qb-green)' : closePct >= 70 ? 'var(--orange)' : 'var(--red)'};">${closePct.toFixed(1)}%</strong>` +
         (agg.lostAmt > 0 ? `<div style="font-size:.72rem;color:var(--red);">${fmt(agg.lostAmt)} lost</div>` : '');
+    const filterable = name && name !== 'Unassigned';
+    const dataAttr = filterable ? `data-rep="${name.replace(/"/g, '&quot;')}"` : '';
+    const trClass = filterable ? 'clickable' : '';
+    const titleAttr = filterable ? `title="Click to filter dashboard for ${name.replace(/"/g, '&quot;')}"` : '';
     return `
-      <tr>
+      <tr class="${trClass}" ${dataAttr} ${titleAttr}>
         <td class="leaderboard-rank ${i < 3 ? 'top' : ''}">${rank}</td>
         <td><strong>${name}</strong></td>
         <td class="leaderboard-amt">${fmt(agg.revenue)}</td>
@@ -1278,6 +1430,21 @@ function renderLeaderboard(rows, classPL) {
       </tr>
     `;
   }).join('');
+}
+
+function filterByRep(repName) {
+  const sel = $('filter-rep');
+  if (!sel) return;
+  const hasOption = [...sel.options].some(o => o.value === repName);
+  if (!hasOption) {
+    const opt = document.createElement('option');
+    opt.value = repName;
+    opt.textContent = repName;
+    sel.appendChild(opt);
+  }
+  sel.value = repName;
+  refreshDashboard();
+  sel.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function renderAttention(rows) {
@@ -1305,7 +1472,7 @@ function renderAttention(rows) {
     chip.textContent = `${baseLabel} (${n})`;
   });
   const visible = _attentionFlag ? flags.filter(f => f.reasons.includes(_attentionFlag)) : flags;
-  $('attention-heading').innerHTML = `⚠️ Requires Attention <span style="font-size:.8rem;color:var(--text2);font-weight:500;">(${flags.length})</span>`;
+  $('attention-heading').innerHTML = `<span class="icon heading-icon" style="color:var(--orange);" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>Requires Attention <span style="font-size:.8rem;color:var(--text2);font-weight:500;">(${flags.length})</span>`;
   const navCount = $('nav-attention-count');
   if (navCount) navCount.textContent = flags.length ? `(${flags.length})` : '';
   if (!visible.length) {
@@ -1320,11 +1487,23 @@ function renderAttention(rows) {
     return `
       ${openTag}
         <div class="attention-reason">${f.reasons.join(' · ')}</div>
-        <div><strong>${f.docNum || '—'}</strong> · ${f.customer || 'No customer'} · ${f.date || ''}${url ? '<span class="qb-link-icon">↗ open in QB</span>' : ''}</div>
+        <div><strong>${f.docNum || '—'}</strong> · ${f.customer || 'No customer'} · ${f.date || ''}${url ? '<span class="qb-link-icon"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> open in QB</span>' : ''}</div>
         <div style="font-weight:600;">${fmt(f.balance || f.amount)}</div>
       ${closeTag}
     `;
   }).join('');
+}
+
+let _pivotSort = { col: 'total', dir: 'desc' };
+const _pivotColDirDefault = { key: 'asc', count: 'desc', total: 'desc', avg: 'desc', open: 'desc' };
+
+function pivotRowValue(key, agg, col) {
+  if (col === 'key') return String(key).toLowerCase();
+  if (col === 'count') return agg.count;
+  if (col === 'total') return agg.total;
+  if (col === 'avg') return agg.count ? agg.total / agg.count : 0;
+  if (col === 'open') return agg.open;
+  return 0;
 }
 
 function renderPivot(rows) {
@@ -1340,26 +1519,77 @@ function renderPivot(rows) {
   const map = new Map();
   for (const r of rows) {
     const key = getKey(r);
-    const agg = map.get(key) || { total: 0, count: 0, open: 0 };
+    const agg = map.get(key) || { total: 0, count: 0, open: 0, latestDate: null, latestRep: null };
     agg.total += r.amount;
     agg.count += 1;
     if (!r.paid) agg.open += r.balance;
+    if (dim === 'customer' && r.date && (!agg.latestDate || r.date > agg.latestDate)) {
+      agg.latestDate = r.date;
+      agg.latestRep = r.rep || 'Unassigned';
+    }
     map.set(key, agg);
   }
-  const sorted = [...map.entries()].sort((a, b) => b[1].total - a[1].total);
+
+  const { col, dir } = _pivotSort;
+  const sorted = [...map.entries()].sort((a, b) => {
+    const va = pivotRowValue(a[0], a[1], col);
+    const vb = pivotRowValue(b[0], b[1], col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  // Refresh header sort indicators
+  document.querySelectorAll('#pivot-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    let ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.setAttribute('aria-hidden', 'true');
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(ind);
+    }
+    ind.textContent = dir === 'asc' ? '↑' : '↓';
+  });
+
   if (!sorted.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text2)">No data</td></tr>';
     return;
   }
-  tbody.innerHTML = sorted.map(([key, agg]) => `
+  tbody.innerHTML = sorted.map(([key, agg]) => {
+    const keyCell = (dim === 'customer' && agg.latestRep)
+      ? `${key} <span style="color:var(--text2);font-weight:400;">· ${agg.latestRep}</span>`
+      : key;
+    return `
     <tr>
-      <td>${key}</td>
+      <td>${keyCell}</td>
       <td>${agg.count}</td>
       <td>${fmt(agg.total)}</td>
       <td>${fmt(agg.total / agg.count)}</td>
       <td>${fmt(agg.open)}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
+}
+
+function wirePivotSort() {
+  document.querySelectorAll('#pivot-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (!col) return;
+      if (_pivotSort.col === col) {
+        _pivotSort.dir = _pivotSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _pivotSort = { col, dir: _pivotColDirDefault[col] || 'desc' };
+      }
+      renderPivot(_lastRows);
+    });
+  });
 }
 
 // Date helpers + quick filter chips
@@ -1423,7 +1653,7 @@ async function refreshDashboard() {
   const startDate = $('filter-start').value;
   const endDate = $('filter-end').value;
   if (!startDate || !endDate) return;
-  $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '⏳';
+  $('kpi-revenue').textContent = $('kpi-cogs').textContent = $('kpi-profit').textContent = $('kpi-margin').textContent = '—';
 
   const repFilter = $('filter-rep').value || null;
   const productFilter = $('filter-product').value || null;
