@@ -213,6 +213,18 @@
   .attention-reason { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: var(--text2); font-weight: 600; }
   .attention-empty { padding: 20px; text-align: center; color: var(--text2); font-size: .9rem; }
 
+  /* Commission */
+  #comm-deductions-table input[type="number"], #comm-deductions-table input[type="text"] { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; font-size: .85rem; font-family: inherit; width: 100%; font-variant-numeric: tabular-nums; }
+  #comm-deductions-table input[type="number"]:focus-visible, #comm-deductions-table input[type="text"]:focus-visible { outline: 2px solid var(--qb-blue); outline-offset: 1px; }
+  #comm-deductions-table .auto-row { background: rgba(40,239,206,.04); }
+  #comm-deductions-table .auto-label { font-weight: 600; }
+  #comm-deductions-table .basis-cell { color: var(--text2); font-size: .8rem; }
+  .delta-up { color: var(--qb-green); font-weight: 600; }
+  .delta-down { color: var(--red); font-weight: 600; }
+  .delta-flat { color: var(--text2); }
+  .remove-row-btn { background: transparent; border: 1px solid var(--border); color: var(--red); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: .75rem; font-family: inherit; }
+  .remove-row-btn:hover { border-color: var(--red); }
+
   /* Rep history strip */
   .rep-history { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
   .rep-pip { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 4px; font-size: .7rem; font-weight: 700; cursor: default; user-select: none; line-height: 1; }
@@ -348,6 +360,7 @@
     <div class="page-nav">
       <button data-page="dashboard" class="active" onclick="showPage('dashboard')">Dashboard</button>
       <button data-page="attention" onclick="showPage('attention')">Requires Attention <span id="nav-attention-count" style="color:var(--text2);font-weight:500;"></span></button>
+      <button data-page="commission" onclick="showPage('commission')">Commission</button>
     </div>
 
     <!-- Shared filters -->
@@ -530,6 +543,94 @@
         </div>
         <div class="attention-list" id="attention-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
       </div>
+    </div>
+
+    <!-- PAGE: Commission -->
+    <div id="page-commission" class="hidden">
+      <div class="table-card">
+        <h3>Commission Report</h3>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month. Auto-pulled from QBO; deductions and rate persist to storage.</p>
+        <div class="filters">
+          <label>Rep<select id="comm-rep"><option value="">Select…</option></select></label>
+          <label>Month<input type="month" id="comm-month"></label>
+          <button class="apply-btn" type="button" onclick="loadCommissionReport()">Run Report</button>
+        </div>
+      </div>
+
+      <div id="comm-report" class="hidden">
+        <!-- Period Summary -->
+        <div class="kpi-grid">
+          <div class="kpi-card revenue"><div class="label">Revenue</div><div class="value" id="comm-revenue">—</div><div class="sub" id="comm-revenue-sub"></div></div>
+          <div class="kpi-card cogs"><div class="label">COGS</div><div class="value" id="comm-cogs">—</div><div class="sub" id="comm-cogs-sub"></div></div>
+          <div class="kpi-card profit"><div class="label">Gross Profit</div><div class="value" id="comm-gp">—</div><div class="sub" id="comm-gp-sub"></div></div>
+          <div class="kpi-card margin"><div class="label">GP Margin</div><div class="value" id="comm-margin">—</div><div class="sub"></div></div>
+        </div>
+
+        <div class="kpi-strip">
+          <div class="item"><div class="label">Invoices</div><div class="value" id="comm-inv-count">—</div><div class="sub" id="comm-inv-count-sub"></div></div>
+          <div class="item"><div class="label">Sales Conversion</div><div class="value" id="comm-conversion">—</div><div class="sub" id="comm-conversion-sub"></div></div>
+          <div class="item"><div class="label">COGS Coverage</div><div class="value" id="comm-cogs-coverage">—</div><div class="sub" id="comm-cogs-coverage-sub">% of revenue with item cost</div></div>
+          <div class="item"><div class="label">Customers</div><div class="value" id="comm-customer-count">—</div><div class="sub" id="comm-customer-count-sub"></div></div>
+        </div>
+
+        <!-- Deductions -->
+        <div class="table-card">
+          <h3>Deductions</h3>
+          <div class="table-wrap">
+            <table id="comm-deductions-table">
+              <thead><tr><th>Deduction</th><th>Basis</th><th style="width:120px;">Rate %</th><th style="width:140px;">Amount</th><th style="width:60px;"></th></tr></thead>
+              <tbody id="comm-deductions-tbody"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;">
+            <button class="save-all-btn" type="button" style="background:transparent;color:var(--qb-blue);border:1px solid var(--qb-blue);" onclick="addCustomDeductionRow()">+ Add custom deduction</button>
+          </div>
+        </div>
+
+        <!-- Commission summary -->
+        <div class="table-card">
+          <h3>Commission</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;">
+            <div>
+              <div class="label" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);font-weight:500;margin-bottom:4px;">Commission Base (GP − deductions)</div>
+              <div style="font-size:1.5rem;font-weight:600;font-variant-numeric:tabular-nums;" id="comm-base">—</div>
+            </div>
+            <div>
+              <div class="label" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;color:var(--text2);font-weight:500;margin-bottom:4px;">Rate %</div>
+              <input id="comm-rate" type="number" step="0.1" min="0" max="100" placeholder="e.g. 10" style="border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:1.1rem;background:var(--surface-2);color:var(--text);font-family:inherit;width:100%;font-variant-numeric:tabular-nums;" oninput="recomputeCommission()">
+            </div>
+            <div>
+              <div class="label" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.6px;color:var(--qb-green);font-weight:500;margin-bottom:4px;">Commission Due</div>
+              <div style="font-size:2rem;font-weight:700;color:var(--qb-green);font-variant-numeric:tabular-nums;" id="comm-due">—</div>
+            </div>
+          </div>
+          <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
+            <span class="row-save-status" id="comm-save-status" aria-live="polite"></span>
+            <button class="save-all-btn" type="button" id="comm-save-btn" onclick="saveCommissionConfig()">Save Rate &amp; Deductions</button>
+          </div>
+        </div>
+
+        <!-- Customer Reference -->
+        <div class="table-card">
+          <h3>Customer Reference <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· vs prior month</span></h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Customer</th>
+                <th>Invoices</th>
+                <th>Total $</th>
+                <th>Avg $</th>
+                <th>Last Month $</th>
+                <th>Δ $</th>
+                <th>Δ %</th>
+              </tr></thead>
+              <tbody id="comm-customer-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div id="comm-empty" style="text-align:center;color:var(--text2);padding:40px 20px;">Pick a rep and month, then Run Report.</div>
     </div>
   </div>
 </div>
@@ -1921,6 +2022,8 @@ function showPage(name) {
   document.querySelectorAll('.page-nav button').forEach(b => b.classList.toggle('active', b.dataset.page === name));
   $('page-dashboard').classList.toggle('hidden', name !== 'dashboard');
   $('page-attention').classList.toggle('hidden', name !== 'attention');
+  $('page-commission').classList.toggle('hidden', name !== 'commission');
+  if (name === 'commission' && !_commissionInited) initCommissionPage();
   location.hash = name;
 }
 
@@ -1987,6 +2090,374 @@ async function refreshDashboard() {
     showLogin();
   }
 })();
+
+// =============================================================================
+// COMMISSION REPORT
+// =============================================================================
+
+let _commissionInited = false;
+let _commissionState = {
+  rep: null,
+  month: null,
+  rate: null,
+  customDeductions: [],   // [{id, label, amount}]
+  metrics: null,          // { revenue, cogs, gp, ... }
+  autoDeductions: [],     // [{key, label, basis, rate, amount}]
+};
+
+async function initCommissionPage() {
+  _commissionInited = true;
+  if (!_classList.length && !isDemoMode) {
+    try { await loadRepFilter(); } catch {}
+  }
+  const sel = $('comm-rep');
+  sel.innerHTML = '<option value="">Select…</option>' +
+    _classList.map(c => `<option value="${attrEscape(c.name)}">${attrEscape(c.name)}</option>`).join('');
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  $('comm-month').value = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function monthBounds(yyyymm) {
+  const [y, m] = yyyymm.split('-').map(Number);
+  const start = new Date(y, m - 1, 1);
+  const end = new Date(y, m, 0);
+  return [ymd(start), ymd(end)];
+}
+
+function priorMonthBounds(yyyymm) {
+  const [y, m] = yyyymm.split('-').map(Number);
+  const start = new Date(y, m - 2, 1);
+  const end = new Date(y, m - 1, 0);
+  return [ymd(start), ymd(end)];
+}
+
+async function fetchInvoicesForRepMonth(rep, startDate, endDate) {
+  const all = await loadAllInvoices(startDate, endDate);
+  return all.filter(inv => inv.ClassRef?.name === rep);
+}
+
+function isCcMethod(name) {
+  if (!name) return false;
+  const s = String(name).toLowerCase();
+  return /(visa|mastercard|master card|amex|american express|discover|credit|card)/.test(s);
+}
+
+function shippingFromInvoice(inv) {
+  let total = 0;
+  for (const line of (inv.Line || [])) {
+    if (line.DetailType === 'SalesItemLineDetail') {
+      const name = line.SalesItemLineDetail?.ItemRef?.name || '';
+      if (/ship/i.test(name)) total += Number(line.Amount) || 0;
+    }
+  }
+  return total;
+}
+
+function computeCommissionMetrics(rep, invoices, paymentMap, costMap) {
+  const result = {
+    invoiceCount: invoices.length,
+    revenue: 0,
+    tax: 0,
+    cogs: 0,
+    revenueWithCost: 0,
+    paid: 0,
+    open: 0,
+    overdue: 0,
+    ccPaid: 0,
+    shipping: 0,
+    customers: new Map(),  // name → { count, total }
+  };
+  const today = new Date();
+  for (const inv of invoices) {
+    const total = Number(inv.TotalAmt) || 0;
+    const balance = Number(inv.Balance) || 0;
+    const tax = Number(inv.TxnTaxDetail?.TotalTax) || 0;
+    const status = balance <= 0 && total > 0 ? 'paid' : (inv.DueDate && new Date(inv.DueDate) < today && balance > 0 ? 'overdue' : 'open');
+
+    result.revenue += total;
+    result.tax += tax;
+    if (status === 'paid') result.paid += total;
+    else if (status === 'overdue') result.overdue += balance;
+    else result.open += balance;
+
+    // CC fee basis = paid invoices charged to CC. Use total paid amount on the invoice.
+    const method = paymentMap.get(inv.Id);
+    if (status === 'paid' && isCcMethod(method)) result.ccPaid += total;
+
+    // Shipping line items
+    result.shipping += shippingFromInvoice(inv);
+
+    // COGS + cost coverage
+    for (const line of (inv.Line || [])) {
+      if (line.DetailType !== 'SalesItemLineDetail') continue;
+      const name = line.SalesItemLineDetail?.ItemRef?.name;
+      if (!name) continue;
+      if (/ship/i.test(name)) continue; // exclude shipping from COGS coverage measure
+      const amount = Number(line.Amount) || 0;
+      const qty = Number(line.SalesItemLineDetail?.Qty) || 0;
+      const unitCost = costMap?.get(name) || 0;
+      if (unitCost > 0) {
+        result.cogs += unitCost * qty;
+        result.revenueWithCost += amount;
+      }
+    }
+
+    const cust = inv.CustomerRef?.name || 'Unknown';
+    const c = result.customers.get(cust) || { count: 0, total: 0 };
+    c.count++;
+    c.total += total;
+    result.customers.set(cust, c);
+  }
+  result.gp = result.revenue - result.cogs;
+  result.gpMargin = result.revenue > 0 ? (result.gp / result.revenue) * 100 : 0;
+  result.conversion = result.revenue > 0 ? (result.paid / result.revenue) * 100 : 0;
+  result.cogsCoverage = result.revenue > 0 ? (result.revenueWithCost / result.revenue) * 100 : 0;
+  return result;
+}
+
+function buildAutoDeductions(metrics) {
+  return [
+    { key: 'tax', label: 'Tax', basis: 'Invoice tax (TxnTaxDetail.TotalTax)', rate: null, amount: metrics.tax },
+    { key: 'cc', label: 'Credit card fee', basis: 'Paid via CC × rate', rate: 3, amount: metrics.ccPaid * 0.03, ccPaid: metrics.ccPaid },
+    { key: 'warranty', label: 'Warranty holdback', basis: 'Revenue × rate', rate: 3, amount: metrics.revenue * 0.03 },
+    { key: 'shipping', label: 'Shipping', basis: 'Sum of "Shipping" line items', rate: null, amount: metrics.shipping },
+  ];
+}
+
+async function loadCommissionReport() {
+  const rep = $('comm-rep').value;
+  const month = $('comm-month').value;
+  if (!rep || !month) {
+    alert('Pick a rep and a month first.');
+    return;
+  }
+  if (isDemoMode) {
+    alert('Commission report is not available in demo mode — connect to QuickBooks to use it.');
+    return;
+  }
+  $('comm-empty').classList.add('hidden');
+  $('comm-report').classList.remove('hidden');
+  // Loading placeholders
+  ['comm-revenue','comm-cogs','comm-gp','comm-margin','comm-inv-count','comm-conversion','comm-cogs-coverage','comm-customer-count','comm-base','comm-due'].forEach(id => { const el = $(id); if (el) el.textContent = '…'; });
+  $('comm-deductions-tbody').innerHTML = '<tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
+  $('comm-customer-tbody').innerHTML = '<tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
+
+  const [start, end] = monthBounds(month);
+  const [pStart, pEnd] = priorMonthBounds(month);
+
+  try {
+    const [thisInvoices, lastInvoices, paymentMap, costMap, savedConfig] = await Promise.all([
+      fetchInvoicesForRepMonth(rep, start, end),
+      fetchInvoicesForRepMonth(rep, pStart, pEnd),
+      loadPaymentMap(start, end),
+      loadItemCostMap(),
+      loadCommissionConfig(rep, month),
+    ]);
+
+    const metrics = computeCommissionMetrics(rep, thisInvoices, paymentMap, costMap);
+    const lastMetrics = computeCommissionMetrics(rep, lastInvoices, new Map(), costMap);
+
+    _commissionState = {
+      rep, month,
+      rate: savedConfig.rate,
+      customDeductions: (savedConfig.deductions || []).map(d => ({ ...d })),
+      metrics,
+      lastMetrics,
+      autoDeductions: buildAutoDeductions(metrics),
+    };
+
+    renderCommissionSummary(metrics);
+    renderDeductionsTable();
+    renderCommissionCustomerTable(metrics, lastMetrics);
+    if (savedConfig.rate != null) $('comm-rate').value = savedConfig.rate;
+    recomputeCommission();
+  } catch (e) {
+    console.error(e);
+    alert('Failed to load commission data: ' + (e.message || e));
+  }
+}
+
+async function loadCommissionConfig(rep, month) {
+  try {
+    const res = await fetch(`/api/commission?rep=${encodeURIComponent(rep)}&month=${encodeURIComponent(month)}`, { credentials: 'include' });
+    if (!res.ok) return { rate: null, deductions: [] };
+    return await res.json();
+  } catch { return { rate: null, deductions: [] }; }
+}
+
+function renderCommissionSummary(m) {
+  $('comm-revenue').textContent = fmt(m.revenue);
+  $('comm-cogs').textContent = fmt(m.cogs);
+  $('comm-gp').textContent = fmt(m.gp);
+  $('comm-margin').textContent = pct(m.gpMargin);
+  $('comm-inv-count').textContent = String(m.invoiceCount);
+  $('comm-inv-count-sub').textContent = `${fmt(m.revenue / Math.max(1, m.invoiceCount))} avg`;
+  $('comm-conversion').textContent = pct(m.conversion);
+  $('comm-conversion-sub').textContent = `${fmt(m.paid)} paid`;
+  $('comm-cogs-coverage').textContent = pct(m.cogsCoverage);
+  const uncovered = m.revenue - m.revenueWithCost;
+  $('comm-cogs-coverage-sub').textContent = uncovered > 0 ? `${fmt(uncovered)} without cost data` : 'fully covered';
+  $('comm-customer-count').textContent = String(m.customers.size);
+}
+
+function renderDeductionsTable() {
+  const tbody = $('comm-deductions-tbody');
+  const auto = _commissionState.autoDeductions || [];
+  const custom = _commissionState.customDeductions || [];
+  const dash = '<span style="color:var(--text2);">—</span>';
+  const autoRows = auto.map(d => {
+    const rateCell = d.rate != null
+      ? `<input type="number" step="0.1" min="0" max="100" value="${d.rate}" data-auto-key="${d.key}" oninput="onAutoRateChange(this)" aria-label="${attrEscape(d.label)} rate">`
+      : dash;
+    return `<tr class="auto-row" data-auto-key="${d.key}">
+      <td class="auto-label">${attrEscape(d.label)}</td>
+      <td class="basis-cell">${attrEscape(d.basis)}</td>
+      <td>${rateCell}</td>
+      <td class="auto-amount">${fmt(d.amount)}</td>
+      <td>${dash}</td>
+    </tr>`;
+  }).join('');
+  const customRows = custom.map(d => `
+    <tr data-custom-id="${attrEscape(d.id)}">
+      <td><input type="text" value="${attrEscape(d.label)}" placeholder="Label (e.g. Gas card)" oninput="onCustomFieldChange(this, 'label')" aria-label="Custom deduction label"></td>
+      <td class="basis-cell">Manual</td>
+      <td>${dash}</td>
+      <td><input type="number" step="0.01" value="${d.amount}" oninput="onCustomFieldChange(this, 'amount')" aria-label="Custom deduction amount"></td>
+      <td><button type="button" class="remove-row-btn" onclick="removeCustomDeduction('${attrEscape(d.id)}')">Remove</button></td>
+    </tr>`).join('');
+  const totals = totalDeductions();
+  const totalRow = `<tr style="border-top:2px solid var(--border);background:var(--surface-2);">
+    <td colspan="3" style="text-align:right;font-weight:600;">Total Deductions</td>
+    <td style="font-weight:700;font-variant-numeric:tabular-nums;">${fmt(totals)}</td>
+    <td></td>
+  </tr>`;
+  tbody.innerHTML = autoRows + customRows + totalRow;
+}
+
+function totalDeductions() {
+  const auto = (_commissionState.autoDeductions || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const custom = (_commissionState.customDeductions || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  return auto + custom;
+}
+
+function onAutoRateChange(input) {
+  const key = input.dataset.autoKey;
+  const rate = Number(input.value) || 0;
+  const d = _commissionState.autoDeductions.find(x => x.key === key);
+  if (!d) return;
+  d.rate = rate;
+  if (key === 'cc') d.amount = (d.ccPaid || 0) * (rate / 100);
+  else if (key === 'warranty') d.amount = (_commissionState.metrics.revenue || 0) * (rate / 100);
+  // Update the displayed amount cell
+  const row = input.closest('tr');
+  const amtCell = row?.querySelector('.auto-amount');
+  if (amtCell) amtCell.textContent = fmt(d.amount);
+  // Recompute totals + commission
+  renderDeductionsTable();
+  recomputeCommission();
+}
+
+function onCustomFieldChange(input, field) {
+  const id = input.closest('tr').dataset.customId;
+  const d = _commissionState.customDeductions.find(x => x.id === id);
+  if (!d) return;
+  if (field === 'amount') d.amount = Number(input.value) || 0;
+  else d[field] = input.value;
+  if (field === 'amount') {
+    // refresh totals only
+    const tbody = $('comm-deductions-tbody');
+    if (tbody) {
+      const totalCell = tbody.querySelector('tr:last-child td:nth-child(2)');
+      if (totalCell) totalCell.textContent = fmt(totalDeductions());
+    }
+    recomputeCommission();
+  }
+}
+
+function addCustomDeductionRow() {
+  const id = 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  _commissionState.customDeductions.push({ id, label: '', amount: 0 });
+  renderDeductionsTable();
+}
+
+function removeCustomDeduction(id) {
+  _commissionState.customDeductions = _commissionState.customDeductions.filter(d => d.id !== id);
+  renderDeductionsTable();
+  recomputeCommission();
+}
+
+function recomputeCommission() {
+  const m = _commissionState.metrics;
+  if (!m) return;
+  const total = totalDeductions();
+  const base = m.gp - total;
+  const rate = Number($('comm-rate').value) || 0;
+  const due = base * (rate / 100);
+  $('comm-base').textContent = fmt(base);
+  $('comm-due').textContent = fmt(due);
+}
+
+async function saveCommissionConfig() {
+  const btn = $('comm-save-btn');
+  const status = $('comm-save-status');
+  if (!_commissionState.rep || !_commissionState.month) { alert('Run a report first.'); return; }
+  btn.disabled = true;
+  status.textContent = 'Saving…';
+  status.className = 'row-save-status saving';
+  const rate = Number($('comm-rate').value);
+  const cleanCustom = _commissionState.customDeductions
+    .filter(d => d.label.trim())
+    .map(d => ({ id: d.id, label: d.label.trim().slice(0, 80), amount: Number(d.amount) || 0 }));
+  try {
+    const res = await fetch('/api/commission', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rep: _commissionState.rep, month: _commissionState.month, rate: Number.isFinite(rate) ? rate : null, deductions: cleanCustom }),
+    });
+    if (!res.ok) throw new Error(await res.text() || 'Save failed');
+    status.textContent = 'Saved';
+    status.className = 'row-save-status saved';
+    setTimeout(() => { status.textContent = ''; status.className = 'row-save-status'; }, 2000);
+  } catch (e) {
+    status.textContent = 'Failed';
+    status.className = 'row-save-status failed';
+    status.title = e.message || 'Save failed';
+  }
+  btn.disabled = false;
+}
+
+function renderCommissionCustomerTable(thisMonth, lastMonth) {
+  const tbody = $('comm-customer-tbody');
+  if (!thisMonth.customers.size) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices in this month for selected rep.</td></tr>';
+    return;
+  }
+  const rows = [...thisMonth.customers.entries()]
+    .sort((a, b) => b[1].total - a[1].total)
+    .map(([name, c]) => {
+      const last = lastMonth.customers.get(name);
+      const lastTotal = last?.total || 0;
+      const delta = c.total - lastTotal;
+      const deltaPct = lastTotal > 0 ? (delta / lastTotal) * 100 : null;
+      const deltaClass = !lastTotal && c.total ? 'delta-up' : delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : 'delta-flat';
+      const arrow = !lastTotal && c.total ? 'new' : delta > 0 ? '↑' : delta < 0 ? '↓' : '–';
+      const pctCell = deltaPct === null ? (c.total ? '<span class="delta-up">new</span>' : '<span class="delta-flat">—</span>') : `<span class="${deltaClass}">${arrow} ${pct(Math.abs(deltaPct))}</span>`;
+      const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
+      const deltaText = delta === 0 ? '—' : sign + fmt(Math.abs(delta));
+      return `<tr>
+        <td><strong>${attrEscape(name)}</strong></td>
+        <td>${c.count}</td>
+        <td>${fmt(c.total)}</td>
+        <td>${fmt(c.total / c.count)}</td>
+        <td>${lastTotal ? fmt(lastTotal) : '<span style="color:var(--text2);">—</span>'}</td>
+        <td class="${deltaClass}">${deltaText}</td>
+        <td>${pctCell}</td>
+      </tr>`;
+    }).join('');
+  tbody.innerHTML = rows;
+}
 </script>
 </body>
 </html>

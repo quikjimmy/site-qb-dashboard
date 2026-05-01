@@ -4,6 +4,7 @@
   "scripts": {
     "start": "npx serve ."
   },
-  "dependencies": {},
-  "devDependencies": {}
+  "dependencies": {
+    "@vercel/blob": "^2.3.3"
+  }
 }
