@@ -435,7 +435,7 @@
       <label>Start Date<input type="date" id="filter-start"></label>
       <label>End Date<input type="date" id="filter-end"></label>
       <label>Sales Rep / Class<select id="filter-rep"><option value="">All</option></select></label>
-      <label>Product<select id="filter-product"><option value="">All Armovex Products</option></select></label>
+      <label>Product<select id="filter-product"><option value="">All Products</option></select></label>
       <button class="apply-btn" onclick="refreshDashboard()">Apply</button>
     </div>
 
@@ -1109,7 +1109,7 @@ function loadDemoData() {
   populateInvoiceRepFilter(rows);
   renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 });
   // Demo: synthesize a paid-in-range slice (treat 'paid' rows as paid-in-range with paidAmount = amount)
-  const demoPaidRows = rows.filter(r => r.paid).map(r => ({ ...r, paidAmount: r.amount }));
+  const demoPaidRows = rows.filter(r => r.paid).map(r => ({ ...r, paidAmount: r.amount, netPaid: r.amount * 0.93 }));
   renderStatusBreakdown(rows, demoPaidRows);
   const demoProducts = new Map([
     ['Installation Service', { revenue: 184200, qty: 52, cogs: 82000, hasCost: true }],
@@ -1840,12 +1840,19 @@ function buildPaidInRangeRows(rawInvoices, paidMap, paymentMethodMap, repFilter,
       const productLines = (inv.Line || []).filter(l => l.DetailType === 'SalesItemLineDetail');
       const productLinesWithItem = productLines.filter(l => l.SalesItemLineDetail?.ItemRef?.value);
       const missingItemData = total > 0 && productLinesWithItem.length === 0;
+      // Net revenue: paid amount minus prorated tax + shipping. Lines this up with QBO's
+      // P&L cash-basis Income figure (Total Revenue), which excludes those pass-throughs.
+      const tax = taxFromInvoice(inv);
+      const ship = shippingFromInvoice(inv);
+      const ratio = total > 0 ? (paidInfo.paidAmount || 0) / total : 0;
+      const netPaid = (paidInfo.paidAmount || 0) - (tax + ship) * ratio;
       return {
         id: inv.Id,
         syncToken: inv.SyncToken,
         date: inv.TxnDate,                 // invoice creation date
         paidDate: paidInfo.paidDate,
         paidAmount: paidInfo.paidAmount,
+        netPaid,
         paidMethod: paidInfo.method,
         docNum: inv.DocNumber,
         customer: inv.CustomerRef?.name || null,
@@ -1911,7 +1918,8 @@ function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
 // Renderers driven by shared invoice data
 
 // Open / Overdue use invoices CREATED in range with Balance > 0.
-// Paid uses cash-received-in-range (paid-in-range rows).
+// Paid uses cash-received-in-range (paid-in-range rows), net of tax + shipping
+// so it ties out to Total Revenue (QBO P&L cash-basis Income).
 // These three are intentionally on different data sources so Open/Overdue
 // don't double-count revenue that's already collected.
 function renderStatusBreakdown(createdRows, paidRows) {
@@ -1920,7 +1928,9 @@ function renderStatusBreakdown(createdRows, paidRows) {
   const overdue = createdRows.filter(r => r.balance > 0 && r.dueDate && new Date(r.dueDate) < today);
   const openTotal = open.reduce((s, r) => s + r.balance, 0);
   const overdueTotal = overdue.reduce((s, r) => s + r.balance, 0);
-  const paidTotal = paidRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
+  const paidTotal = paidRows.reduce((s, r) => s + (Number(r.netPaid) || 0), 0);
+  const grossPaid = paidRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
+  const passThrough = grossPaid - paidTotal; // tax + shipping
   const overdueDays = overdue.reduce((s, r) => s + Math.max(0, Math.floor((today - new Date(r.dueDate)) / 86400000)), 0);
   const avgOverdue = overdue.length ? Math.round(overdueDays / overdue.length) : 0;
   const inv = n => `${n} invoice${n === 1 ? '' : 's'}`;
@@ -1929,7 +1939,9 @@ function renderStatusBreakdown(createdRows, paidRows) {
   $('status-overdue-amt').textContent = fmt(overdueTotal);
   $('status-overdue-sub').textContent = overdue.length ? `${inv(overdue.length)} · avg ${avgOverdue}d late` : 'none past due';
   $('status-paid-amt').textContent = fmt(paidTotal);
-  $('status-paid-sub').textContent = paidRows.length ? inv(paidRows.length) : 'no payments';
+  $('status-paid-sub').textContent = paidRows.length
+    ? `${inv(paidRows.length)} · ${fmt(grossPaid)} cash collected (incl. ${fmt(passThrough)} tax/shipping)`
+    : 'no payments';
   const createdTotal = Math.max(1, createdRows.length);
   const paidVisualTotal = Math.max(1, paidRows.length);
   renderMiniDonut('chart-status-open', open.length, createdTotal - open.length, '#fb8c00');
@@ -1989,7 +2001,7 @@ async function populateProductFilter() {
   const sel = $('filter-product');
   if (!sel) return;
   const current = sel.value;
-  sel.innerHTML = '<option value="">All Armovex Products</option>' + _itemNames.map(n => `<option value="${n}">${n}</option>`).join('');
+  sel.innerHTML = '<option value="">All Products</option>' + _itemNames.map(n => `<option value="${n}">${n}</option>`).join('');
   if (_itemNames.includes(current)) sel.value = current;
 }
 
