@@ -45,7 +45,7 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     let body;
     try { body = JSON.parse(await readBody(req) || '{}'); } catch { res.statusCode = 400; return res.end('Invalid JSON'); }
-    const { rep, month, rate, ccRate, warrantyRate, status, overrides, deductions } = body;
+    const { rep, month, rate, ccRate, warrantyRate, status, overrides, deductions, commissionDue } = body;
     if (!REP_RE.test(rep || '') || !MONTH_RE.test(month || '')) {
       res.statusCode = 400; return res.end('Invalid rep or month');
     }
@@ -74,6 +74,7 @@ module.exports = async (req, res) => {
       label: String(d.label || '').slice(0, 80),
       amount: num(d.amount) || 0,
     })).filter(d => d.id && d.label);
+    const cleanCommissionDue = num(commissionDue);
     try {
       const saved = await setRecord(rep, month, {
         rate: cleanRate,
@@ -82,6 +83,7 @@ module.exports = async (req, res) => {
         status: cleanStatus,
         overrides: cleanOverrides,
         deductions: cleanDeductions,
+        commissionDue: cleanCommissionDue,
       });
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify(saved));

@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ops Hub</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%226%22%20fill%3D%22%230a090f%22%2F%3E%3Crect%20x%3D%226%22%20y%3D%2218%22%20width%3D%224%22%20height%3D%229%22%20rx%3D%221%22%20fill%3D%22%2374e79a%22%2F%3E%3Crect%20x%3D%2214%22%20y%3D%2212%22%20width%3D%224%22%20height%3D%2215%22%20rx%3D%221%22%20fill%3D%22%2328efce%22%2F%3E%3Crect%20x%3D%2222%22%20y%3D%226%22%20width%3D%224%22%20height%3D%2221%22%20rx%3D%221%22%20fill%3D%22%2328efce%22%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -78,7 +79,7 @@
   .kpi-card.headline .label { color: var(--qb-green); letter-spacing: .8px; }
 
   /* Compact activity strip */
-  .kpi-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; padding: 14px 18px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+  .kpi-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; padding: 14px 18px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
   .kpi-strip .item { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; border-right: 1px solid var(--border); }
   .kpi-strip .item:last-child { border-right: none; }
   .kpi-strip .item:first-child { padding-left: 0; }
@@ -120,6 +121,7 @@
   .table-card h3 { font-size: .85rem; margin-bottom: 14px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
   .table-wrap { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .table-card td, .table-card th { font-variant-numeric: tabular-nums; }
   thead th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text2); font-weight: 500; font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; }
   tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
   tbody tr:hover { background: var(--surface-2); }
@@ -246,26 +248,48 @@
   .cogs-row.missing { background: rgba(244,180,67,.06); }
   .cogs-row.missing td:first-child { border-left: 3px solid var(--orange); padding-left: 9px; }
 
+  /* CC pill on commission invoices table */
+  .cc-pill { display: inline-block; font-size: .62rem; font-weight: 700; letter-spacing: .4px; padding: 2px 6px; border-radius: 3px; background: rgba(40,239,206,.15); color: var(--qb-blue); border: 1px solid rgba(40,239,206,.35); vertical-align: middle; }
+
   .print-only { display: none; }
   /* Print stylesheet — rep-facing version */
   @media print {
     .print-only { display: block; }
     @page { size: letter; margin: 0.5in; }
-    body { background: white !important; color: black !important; }
-    .topbar, .page-nav, .filters, #login-screen, #page-dashboard, #page-attention, .save-all-btn, .table-actions, .remove-row-btn, .auto-hint, button, #comm-saved-drawer { display: none !important; }
+    body { background: white !important; color: black !important; font-family: Inter, system-ui, sans-serif; }
+    .topbar, .page-nav, .filters, #login-screen, #page-dashboard, #page-attention, .save-all-btn, .table-actions, .remove-row-btn, .auto-hint, button, #comm-archive, #comm-editor-header, #comm-new-form, #comm-applied-credits-note { display: none !important; }
     #page-commission, #page-commission * { color: #000 !important; }
     .table-card, .kpi-card, .kpi-strip { background: white !important; border: 1px solid #ddd !important; box-shadow: none !important; break-inside: avoid; }
     .kpi-card .value { color: #000 !important; }
     .kpi-card.headline { background: #f6fbf8 !important; }
-    table { font-size: 11px !important; }
-    thead th { color: #444 !important; }
+    table { font-size: 10.5px !important; font-variant-numeric: tabular-nums !important; }
+    thead { display: table-header-group !important; }
+    thead th { color: #444 !important; background: #f5f5f5 !important; }
+    tr, .kpi-card, .kpi-strip, .table-card { break-inside: avoid; }
     .status-pill.final { background: #e8f7ed !important; color: #1a6634 !important; border: 1px solid #1a6634 !important; }
     .status-pill.draft { background: #fff5e0 !important; color: #7a5a00 !important; border: 1px solid #7a5a00 !important; }
-    #comm-deductions-table input { border: none !important; background: transparent !important; padding: 0 !important; color: #000 !important; }
+    #comm-deductions-table input { border: none !important; background: transparent !important; padding: 0 !important; color: #000 !important; font-variant-numeric: tabular-nums !important; }
     #comm-deductions-table input::placeholder { color: transparent !important; }
+    #comm-deductions-table .auto-hint { font-size: 9px !important; color: #555 !important; }
     #comm-rate { border: none !important; background: transparent !important; padding: 0 !important; }
     .delta-up { color: #1a6634 !important; }
     .delta-down { color: #b03a1a !important; }
+    .cc-pill { background: #e8f7ed !important; color: #1a6634 !important; border-color: #1a6634 !important; }
+    /* Print cover sheet */
+    .print-cover { display: block !important; padding: 0 0 24px 0; border-bottom: 3px solid #0a090f; margin-bottom: 24px; }
+    .print-cover .brand { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
+    .print-cover .title { font-size: 18px; font-weight: 600; color: #444 !important; margin-top: 4px; }
+    .print-cover .meta { font-size: 11px; color: #555 !important; margin-top: 8px; }
+    .print-cover .status-pill { font-size: 11px; padding: 3px 10px; }
+    .print-headline { background: #f6fbf8 !important; border: 2px solid #1a6634 !important; padding: 14px 18px; margin: 14px 0; }
+    .print-headline .label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: #444 !important; font-weight: 600; }
+    .print-headline .value { font-size: 28px; font-weight: 700; color: #1a6634 !important; }
+    .print-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; margin: 18px 0 8px 0; padding-bottom: 4px; border-bottom: 1px solid #999; page-break-after: avoid; }
+    .print-signoff { margin-top: 32px; page-break-inside: avoid; }
+    .print-signoff .row { display: flex; gap: 40px; margin-top: 36px; }
+    .print-signoff .sig { flex: 1; border-top: 1px solid #000; padding-top: 4px; font-size: 10px; }
+    .print-footer { margin-top: 24px; font-size: 9px; color: #777 !important; text-align: center; }
+    .new-page { page-break-before: always; }
   }
 
   /* Rep history strip */
@@ -416,12 +440,19 @@
     </div>
 
     <!-- Quick filter chips -->
-    <div class="chip-row" id="chip-row">
+    <div class="chip-row" id="chip-row" role="group" aria-label="Paid date quick filters">
+      <button class="chip" data-range="today">Today</button>
+      <button class="chip" data-range="yesterday">Yesterday</button>
       <button class="chip" data-range="this-week">This Week</button>
       <button class="chip" data-range="last-week">Last Week</button>
+      <button class="chip" data-range="last-7">Last 7</button>
       <button class="chip" data-range="this-month">This Month</button>
       <button class="chip" data-range="last-month">Last Month</button>
-      <button class="chip" data-range="ytd">Year to Date</button>
+      <button class="chip" data-range="last-30">Last 30</button>
+      <button class="chip" data-range="mtd">MTD</button>
+      <button class="chip" data-range="qtd">QTD</button>
+      <button class="chip" data-range="ytd">YTD</button>
+      <button class="chip" data-range="last-year">Last Year</button>
     </div>
 
     <!-- PAGE: Dashboard -->
@@ -439,7 +470,6 @@
         <div class="item"><div class="label">Paid Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
         <div class="item"><div class="label">Paid This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
         <div class="item"><div class="label">Paid This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
-        <div class="item"><div class="label">Paid In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
       </div>
 
       <!-- Status breakdown -->
@@ -489,8 +519,19 @@
       <div class="table-card">
         <h3><span class="icon heading-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg></span>Sales Rep Leaderboard</h3>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th style="width:40px;">Rank</th><th>Rep</th><th>Gross Revenue</th><th>COGS</th><th>GP $</th><th>GP %</th><th title="Paid$ / (Paid$ + Lost$) — lost = 90+ days overdue">Close %</th><th>Open</th><th>Past Due</th><th>Invoices</th></tr></thead>
+          <table class="sortable-table" id="leaderboard-table">
+            <thead><tr>
+              <th style="width:40px;">Rank</th>
+              <th data-sort="name">Rep</th>
+              <th data-sort="revenue" class="sort-active">Gross Revenue <span class="sort-ind" aria-hidden="true">↓</span></th>
+              <th data-sort="cogs">COGS</th>
+              <th data-sort="gp">GP $</th>
+              <th data-sort="gpPct">GP %</th>
+              <th data-sort="closePct" title="Paid$ / (Paid$ + Lost$) — lost = 90+ days overdue">Close %</th>
+              <th data-sort="openCount">Open</th>
+              <th data-sort="overdueCount">Past Due</th>
+              <th data-sort="count">Invoices</th>
+            </tr></thead>
             <tbody id="leaderboard-tbody"><tr><td colspan="10" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
@@ -515,6 +556,24 @@
         </div>
         <button id="products-show-all" class="hidden" type="button" onclick="toggleProductsShowAll()" style="margin-top:12px;background:transparent;border:1px solid var(--border);color:var(--text2);padding:8px 16px;min-height:36px;border-radius:6px;cursor:pointer;font-family:inherit;font-size:.8rem;font-weight:500;transition:border-color .15s,color .15s;">Show all</button>
       </div>
+
+      <!-- COGS Coverage table — data quality drill-down -->
+      <details class="table-card" id="cogs-coverage-details">
+        <summary><h3>COGS Coverage <span id="cogs-coverage-count" style="color:var(--text2);font-weight:500;"></span> <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· line items in paid invoices · click rows to see invoices</span></h3></summary>
+        <div class="table-wrap">
+          <table class="sortable-table" id="cogs-coverage-table">
+            <thead><tr>
+              <th data-sort="hasCost">Status</th>
+              <th data-sort="name">SKU</th>
+              <th data-sort="qty">Units sold</th>
+              <th data-sort="revenue" class="sort-active">Revenue <span class="sort-ind" aria-hidden="true">↓</span></th>
+              <th data-sort="unitCost">Unit cost</th>
+              <th data-sort="cogs">Implied COGS</th>
+            </tr></thead>
+            <tbody id="cogs-coverage-tbody"><tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2);">No data yet — apply a filter range with paid invoices.</td></tr></tbody>
+          </table>
+        </div>
+      </details>
 
       <!-- Pivot table -->
       <div class="table-card">
@@ -598,26 +657,79 @@
 
     <!-- PAGE: Commission -->
     <div id="page-commission" class="hidden">
-      <div class="table-card">
-        <h3>Commission Report <span id="comm-status-pill" class="status-pill draft hidden">Draft</span></h3>
-        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month — <strong>cash basis</strong>: based on the date payments were received, not invoice creation date. Includes partial payments (prorated tax/shipping/COGS).</p>
-        <div class="filters">
-          <label>Rep<select id="comm-rep"><option value="">Select…</option></select></label>
-          <label>Month<input type="month" id="comm-month"></label>
-          <button class="apply-btn" type="button" onclick="loadCommissionReport()">Run Report</button>
-          <button class="apply-btn" type="button" onclick="toggleSavedDrawer()" style="background:transparent;color:var(--qb-blue);border:1px solid var(--qb-blue);">Saved Reports</button>
+      <!-- Archive landing view -->
+      <div id="comm-archive" class="table-card">
+        <h3>Commission Reports <span id="comm-archive-count" style="color:var(--text2);font-weight:500;"></span></h3>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Saved per rep, per month — <strong>cash basis</strong> (defined by payment date). Click any row to open. Use <em>+ New Report</em> to start a fresh one.</p>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <button class="apply-btn" type="button" onclick="showCommNewReportForm()">+ New Report</button>
+          <div class="chip-row" id="comm-archive-status" role="group" aria-label="Status filter" style="margin-bottom:0;">
+            <button class="chip active" data-status-filter="all" aria-pressed="true">All</button>
+            <button class="chip" data-status-filter="draft" aria-pressed="false">Draft</button>
+            <button class="chip" data-status-filter="final" aria-pressed="false">Final</button>
+          </div>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text2);">Rep
+            <select id="comm-archive-rep" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:.85rem;font-family:inherit;"><option value="">All reps</option></select>
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;color:var(--text2);">Month
+            <select id="comm-archive-month" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:6px 8px;font-size:.85rem;font-family:inherit;"><option value="">All months</option></select>
+          </label>
         </div>
-        <div id="comm-saved-drawer" class="hidden" style="margin-top:14px;">
-          <div id="comm-saved-list" class="saved-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
+        <!-- New report form -->
+        <div id="comm-new-form" class="hidden" style="margin-bottom:16px;padding:14px;border:1px dashed var(--border);border-radius:8px;background:var(--surface-2);">
+          <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;">
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--text2);">Rep
+              <select id="comm-rep" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:.85rem;font-family:inherit;min-width:200px;"><option value="">Select…</option></select>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:4px;font-size:.78rem;color:var(--text2);">Month
+              <input type="month" id="comm-month" style="background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;padding:8px 10px;font-size:.85rem;font-family:inherit;">
+            </label>
+            <button class="apply-btn" type="button" onclick="loadCommissionReport()">Run Report</button>
+            <button class="apply-btn" type="button" onclick="hideCommNewReportForm()" style="background:transparent;color:var(--text2);border:1px solid var(--border);">Cancel</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="sortable-table" id="comm-archive-table">
+            <thead><tr>
+              <th data-sort="rep">Rep</th>
+              <th data-sort="month">Month</th>
+              <th data-sort="status">Status</th>
+              <th data-sort="rate">Rate</th>
+              <th data-sort="commissionDue">Commission Due</th>
+              <th data-sort="updatedAt" class="sort-active">Updated <span class="sort-ind" aria-hidden="true">↓</span></th>
+              <th></th>
+            </tr></thead>
+            <tbody id="comm-archive-tbody"><tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
+          </table>
         </div>
       </div>
 
-      <div id="comm-report" class="hidden">
-        <!-- Print-only header -->
-        <div class="print-only" style="margin-bottom:16px;">
-          <div style="font-size:1.6rem;font-weight:700;" id="comm-print-title">Commission Report</div>
-          <div style="font-size:.95rem;color:#444;margin-top:4px;" id="comm-print-period">—</div>
+      <!-- Editor view (shown when a report is loaded) -->
+      <div id="comm-editor-header" class="hidden table-card" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+        <div>
+          <button type="button" onclick="showCommArchive()" style="background:transparent;border:none;color:var(--qb-blue);cursor:pointer;font-size:.85rem;font-weight:500;padding:0;font-family:inherit;">← Back to all reports</button>
+          <h3 style="margin-top:6px;margin-bottom:0;">Commission Report <span id="comm-status-pill" class="status-pill draft hidden">Draft</span></h3>
         </div>
+        <div style="font-size:.8rem;color:var(--text2);" id="comm-editor-period"></div>
+      </div>
+
+      <div id="comm-report" class="hidden">
+        <!-- Print-only cover sheet -->
+        <div class="print-cover print-only">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;">
+            <div>
+              <div class="brand">Armovex</div>
+              <div class="title" id="comm-print-title">Commission Report</div>
+              <div class="meta" id="comm-print-period">—</div>
+            </div>
+            <div><span class="status-pill draft" id="comm-print-status">DRAFT</span></div>
+          </div>
+        </div>
+        <div class="print-headline print-only">
+          <div class="label">Commission Due</div>
+          <div class="value" id="comm-print-due">—</div>
+        </div>
+        <div class="print-section-title print-only">Period Summary</div>
         <!-- Period Summary -->
         <div class="kpi-grid">
           <div class="kpi-card revenue"><div class="label">Revenue</div><div class="value" id="comm-revenue">—</div><div class="sub" id="comm-revenue-sub"></div></div>
@@ -633,9 +745,11 @@
           <div class="item"><div class="label">Customers</div><div class="value" id="comm-customer-count">—</div><div class="sub" id="comm-customer-count-sub"></div></div>
         </div>
 
+        <div class="print-section-title print-only new-page">Deductions</div>
         <!-- Deductions -->
         <div class="table-card">
           <h3>Deductions <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· auto values are pre-filled from QBO; edit any amount to override</span></h3>
+          <div id="comm-applied-credits-note" class="hidden" style="margin-bottom:10px;padding:8px 12px;border-left:3px solid var(--qb-blue);background:rgba(40,239,206,.06);font-size:.78rem;color:var(--text2);"></div>
           <div class="table-wrap">
             <table id="comm-deductions-table">
               <thead><tr><th style="width:160px;">Deduction</th><th>Basis</th><th style="width:90px;">Rate %</th><th style="width:160px;">Amount</th><th style="width:70px;"></th></tr></thead>
@@ -691,6 +805,7 @@
           </div>
         </div>
 
+        <div class="print-section-title print-only new-page">Payments in Period</div>
         <!-- Payments in Period -->
         <div class="table-card">
           <h3>Payments in Period <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· each row = one payment applied to one invoice; click to open invoice in QBO</span></h3>
@@ -730,9 +845,19 @@
             </table>
           </div>
         </details>
+
+        <!-- Print-only sign-off -->
+        <div class="print-only print-signoff" id="comm-print-signoff">
+          <div class="print-section-title">Sign-off</div>
+          <div class="row">
+            <div class="sig">Sales Rep — signature &amp; date</div>
+            <div class="sig">Manager — signature &amp; date</div>
+          </div>
+          <div class="print-footer" id="comm-print-footer">Generated from QBO data · cash basis</div>
+        </div>
       </div>
 
-      <div id="comm-empty" style="text-align:center;color:var(--text2);padding:40px 20px;">Pick a rep and month, then Run Report.</div>
+      <div id="comm-empty" class="hidden" style="text-align:center;color:var(--text2);padding:40px 20px;">Pick a rep and month, then Run Report.</div>
     </div>
   </div>
 </div>
@@ -839,9 +964,11 @@ function showDashboard() {
   wireViewToggle();
   wireAttentionFilters();
   wireProductSort();
+  wireCogsCoverageSort();
   wireProductFilter();
   wireLeaderboardClick();
   wireInvoicesSort();
+  wireLeaderboardSort();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   const [s, e] = defaultDateRange();
@@ -933,9 +1060,11 @@ function loadDemoData() {
   wireViewToggle();
   wireAttentionFilters();
   wireProductSort();
+  wireCogsCoverageSort();
   wireProductFilter();
   wireLeaderboardClick();
   wireInvoicesSort();
+  wireLeaderboardSort();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
@@ -978,8 +1107,10 @@ function loadDemoData() {
   buildCustomerHistoryIdx(rows);
   const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
   populateInvoiceRepFilter(rows);
-  renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 }, rows);
-  renderStatusBreakdown(rows);
+  renderInvoiceActivityKpis({ today: 3, todayAmt: 8420, week: 12, weekAmt: 38200, month: 48, monthAmt: 212275 });
+  // Demo: synthesize a paid-in-range slice (treat 'paid' rows as paid-in-range with paidAmount = amount)
+  const demoPaidRows = rows.filter(r => r.paid).map(r => ({ ...r, paidAmount: r.amount }));
+  renderStatusBreakdown(rows, demoPaidRows);
   const demoProducts = new Map([
     ['Installation Service', { revenue: 184200, qty: 52, cogs: 82000, hasCost: true }],
     ['Premium Flooring', { revenue: 142300, qty: 610, cogs: 81400, hasCost: true }],
@@ -1632,16 +1763,14 @@ async function loadInvoiceActivity() {
   }
 }
 
-function renderInvoiceActivityKpis(activity, rangeRows) {
-  $('kpi-inv-today').textContent = String(activity.today);
-  $('kpi-inv-today-sub').textContent = activity.today ? fmt(activity.todayAmt) : 'No payments yet today';
-  $('kpi-inv-week').textContent = String(activity.week);
-  $('kpi-inv-week-sub').textContent = fmt(activity.weekAmt);
-  $('kpi-inv-month').textContent = String(activity.month);
-  $('kpi-inv-month-sub').textContent = fmt(activity.monthAmt);
-  const rangeAmt = rangeRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
-  $('kpi-inv-range').textContent = String(rangeRows.length);
-  $('kpi-inv-range-sub').textContent = fmt(rangeAmt);
+function renderInvoiceActivityKpis(activity) {
+  const inv = (n) => `${n} invoice${n === 1 ? '' : 's'}`;
+  $('kpi-inv-today').textContent = activity.today ? fmt(activity.todayAmt) : '$0';
+  $('kpi-inv-today-sub').textContent = activity.today ? inv(activity.today) : 'No payments yet today';
+  $('kpi-inv-week').textContent = fmt(activity.weekAmt);
+  $('kpi-inv-week-sub').textContent = inv(activity.week);
+  $('kpi-inv-month').textContent = fmt(activity.monthAmt);
+  $('kpi-inv-month-sub').textContent = inv(activity.month);
 }
 
 async function loadPaymentMap(startDate, endDate) {
@@ -1781,25 +1910,31 @@ function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
 
 // Renderers driven by shared invoice data
 
-function renderStatusBreakdown(rows) {
-  const open = rows.filter(r => r.status === 'open');
-  const overdue = rows.filter(r => r.status === 'overdue');
-  const paid = rows.filter(r => r.status === 'paid');
+// Open / Overdue use invoices CREATED in range with Balance > 0.
+// Paid uses cash-received-in-range (paid-in-range rows).
+// These three are intentionally on different data sources so Open/Overdue
+// don't double-count revenue that's already collected.
+function renderStatusBreakdown(createdRows, paidRows) {
+  const today = new Date();
+  const open = createdRows.filter(r => r.balance > 0 && (!r.dueDate || new Date(r.dueDate) >= today));
+  const overdue = createdRows.filter(r => r.balance > 0 && r.dueDate && new Date(r.dueDate) < today);
   const openTotal = open.reduce((s, r) => s + r.balance, 0);
   const overdueTotal = overdue.reduce((s, r) => s + r.balance, 0);
-  const paidTotal = paid.reduce((s, r) => s + r.amount, 0);
-  const total = rows.length;
-  const share = n => total ? (n / total * 100).toFixed(1) : '0.0';
-  const sub = (count, p) => `${count} invoice${count === 1 ? '' : 's'} · ${p}% of total`;
+  const paidTotal = paidRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
+  const overdueDays = overdue.reduce((s, r) => s + Math.max(0, Math.floor((today - new Date(r.dueDate)) / 86400000)), 0);
+  const avgOverdue = overdue.length ? Math.round(overdueDays / overdue.length) : 0;
+  const inv = n => `${n} invoice${n === 1 ? '' : 's'}`;
   $('status-open-amt').textContent = fmt(openTotal);
-  $('status-open-sub').textContent = sub(open.length, share(open.length));
+  $('status-open-sub').textContent = open.length ? inv(open.length) : 'no open invoices';
   $('status-overdue-amt').textContent = fmt(overdueTotal);
-  $('status-overdue-sub').textContent = sub(overdue.length, share(overdue.length));
+  $('status-overdue-sub').textContent = overdue.length ? `${inv(overdue.length)} · avg ${avgOverdue}d late` : 'none past due';
   $('status-paid-amt').textContent = fmt(paidTotal);
-  $('status-paid-sub').textContent = sub(paid.length, share(paid.length));
-  renderMiniDonut('chart-status-open', open.length, total - open.length, '#fb8c00');
-  renderMiniDonut('chart-status-overdue', overdue.length, total - overdue.length, '#e53935');
-  renderMiniDonut('chart-status-paid', paid.length, total - paid.length, '#4caf50');
+  $('status-paid-sub').textContent = paidRows.length ? inv(paidRows.length) : 'no payments';
+  const createdTotal = Math.max(1, createdRows.length);
+  const paidVisualTotal = Math.max(1, paidRows.length);
+  renderMiniDonut('chart-status-open', open.length, createdTotal - open.length, '#fb8c00');
+  renderMiniDonut('chart-status-overdue', overdue.length, createdTotal - overdue.length, '#e53935');
+  renderMiniDonut('chart-status-paid', paidRows.length, paidVisualTotal, '#4caf50');
 }
 
 function renderMiniDonut(canvasId, primary, secondary, color) {
@@ -1977,6 +2112,179 @@ async function loadTopProducts(rawInvoices) {
   renderTopProductsTable(aggregateProducts(rawInvoices, costMap));
 }
 
+// COGS coverage: % of line items / revenue on paid invoices that have a known unit cost.
+let _cogsCoverageState = { skus: new Map(), totalLines: 0, linesWithCost: 0 };
+let _cogsCoverageSort = { col: 'revenue', dir: 'desc' };
+const _cogsCoverageColDirDefault = { hasCost: 'asc', name: 'asc', qty: 'desc', revenue: 'desc', unitCost: 'desc', cogs: 'desc' };
+
+function computeCogsCoverage(paidInvoices, costMap) {
+  const skus = new Map();
+  const shippingRe = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
+  let totalLines = 0, linesWithCost = 0;
+  let totalRevenue = 0, revenueWithCost = 0;
+  for (const inv of paidInvoices) {
+    for (const line of (inv.Line || [])) {
+      if (line.DetailType !== 'SalesItemLineDetail') continue;
+      const name = line.SalesItemLineDetail?.ItemRef?.name;
+      if (!name || shippingRe.test(name)) continue;
+      const amount = Number(line.Amount) || 0;
+      const qty = Number(line.SalesItemLineDetail?.Qty) || 0;
+      const unitCost = costMap?.get(name) || 0;
+      const hasCost = unitCost > 0;
+      totalLines += 1;
+      if (hasCost) linesWithCost += 1;
+      totalRevenue += amount;
+      if (hasCost) revenueWithCost += amount;
+      const sku = skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0, invoices: new Map() };
+      sku.qty += qty;
+      sku.revenue += amount;
+      if (hasCost) { sku.hasCost = true; sku.unitCost = unitCost; }
+      let invEntry = sku.invoices.get(inv.Id);
+      if (!invEntry) {
+        invEntry = { id: inv.Id, docNum: inv.DocNumber, customer: inv.CustomerRef?.name || null, qty: 0, amount: 0, date: inv.TxnDate };
+        sku.invoices.set(inv.Id, invEntry);
+      }
+      invEntry.qty += qty;
+      invEntry.amount += amount;
+    }
+  }
+  return { skus, totalLines, linesWithCost, totalRevenue, revenueWithCost };
+}
+
+function cogsCoverageRowValue(name, sku, col) {
+  if (col === 'hasCost') return sku.hasCost ? 1 : 0;
+  if (col === 'name') return String(name).toLowerCase();
+  if (col === 'qty') return sku.qty || 0;
+  if (col === 'revenue') return sku.revenue || 0;
+  if (col === 'unitCost') return sku.hasCost ? sku.unitCost : -1;
+  if (col === 'cogs') return sku.hasCost ? sku.unitCost * sku.qty : -1;
+  return 0;
+}
+
+function renderCogsCoverageTable() {
+  const tbody = $('cogs-coverage-tbody');
+  if (!tbody) return;
+  const skus = [...(_cogsCoverageState.skus || new Map()).entries()];
+  const { col, dir } = _cogsCoverageSort;
+  skus.sort((a, b) => {
+    // Always surface missing-cost rows first, then apply requested sort
+    if (col !== 'hasCost') {
+      if (a[1].hasCost !== b[1].hasCost) return a[1].hasCost ? 1 : -1;
+    }
+    const va = cogsCoverageRowValue(a[0], a[1], col);
+    const vb = cogsCoverageRowValue(b[0], b[1], col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  document.querySelectorAll('#cogs-coverage-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    let ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.setAttribute('aria-hidden', 'true');
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(ind);
+    }
+    ind.textContent = dir === 'asc' ? '↑' : '↓';
+  });
+  if (!skus.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2);">No paid invoices with product lines in this range.</td></tr>';
+    return;
+  }
+  const dash = '<span style="color:var(--text2);">—</span>';
+  tbody.innerHTML = skus.map(([name, s], i) => {
+    const detailId = `cogs-cov-detail-${i}`;
+    const toggleId = `cogs-cov-toggle-${i}`;
+    const invList = [...s.invoices.values()].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const subRows = invList.length
+      ? invList.map(info => `<tr class="clickable" onclick="event.stopPropagation();openInvoiceInQb('${info.id}')" title="Open in QuickBooks">
+          <td><strong>${attrEscape(info.docNum || '—')}</strong></td>
+          <td>${attrEscape(info.customer || '—')}</td>
+          <td>${info.qty.toFixed(2)}</td>
+          <td>${fmt(info.amount)}</td>
+          <td>${info.date || '—'}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center;color:var(--text2);">No invoice data.</td></tr>`;
+    return `
+      <tr class="cogs-row clickable ${s.hasCost ? '' : 'missing'}" onclick="toggleSkuRow('${detailId}','${toggleId}')" title="Click to see invoices for this SKU">
+        <td>${s.hasCost ? '<span class="badge paid">HAS COST</span>' : '<span class="badge overdue">NO COST</span>'}</td>
+        <td><span id="${toggleId}" style="display:inline-block;width:12px;color:var(--text2);">▸</span> <strong>${attrEscape(name)}</strong> <span style="color:var(--text2);font-size:.7rem;font-weight:400;">· ${invList.length} invoice${invList.length === 1 ? '' : 's'}</span></td>
+        <td>${s.qty ? s.qty.toFixed(2) : dash}</td>
+        <td>${fmt(s.revenue)}</td>
+        <td>${s.hasCost ? fmt(s.unitCost) : dash}</td>
+        <td>${s.hasCost ? fmt(s.unitCost * s.qty) : dash}</td>
+      </tr>
+      <tr id="${detailId}" class="hidden" style="background:var(--surface-2);">
+        <td colspan="6" style="padding:8px 12px;">
+          <table style="width:100%;font-size:.8rem;">
+            <thead><tr><th>Invoice #</th><th>Customer</th><th>Qty</th><th>Amount</th><th>Invoice Date</th></tr></thead>
+            <tbody>${subRows}</tbody>
+          </table>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function wireCogsCoverageSort() {
+  document.querySelectorAll('#cogs-coverage-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (!col) return;
+      if (_cogsCoverageSort.col === col) {
+        _cogsCoverageSort.dir = _cogsCoverageSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _cogsCoverageSort = { col, dir: _cogsCoverageColDirDefault[col] || 'desc' };
+      }
+      renderCogsCoverageTable();
+    });
+  });
+}
+
+function loadCogsCoverage(paidInvoices) {
+  const costMap = _itemCostMap || new Map();
+  const result = computeCogsCoverage(paidInvoices, costMap);
+  _cogsCoverageState = result;
+  // Update COGS KPI sub-line: % of line items with cost data.
+  const sub = $('kpi-cogs-sub');
+  const detailsEl = $('cogs-coverage-details');
+  if (sub) {
+    if (result.totalLines === 0) {
+      sub.textContent = 'no product lines';
+      sub.style.color = 'var(--text2)';
+      sub.style.cursor = 'default';
+      sub.onclick = null;
+    } else {
+      const linePct = (result.linesWithCost / result.totalLines) * 100;
+      const color = linePct >= 90 ? 'var(--qb-green)' : linePct >= 60 ? 'var(--orange)' : 'var(--red)';
+      sub.innerHTML = `<span style="color:${color};font-weight:600;">${linePct.toFixed(0)}% complete</span> · ${result.linesWithCost} of ${result.totalLines} lines have cost data <span style="text-decoration:underline;color:var(--text2);">view</span>`;
+      sub.style.cursor = 'pointer';
+      sub.title = 'Click to inspect SKUs missing cost data';
+      sub.onclick = () => {
+        if (detailsEl) {
+          detailsEl.open = true;
+          detailsEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      };
+    }
+  }
+  // Header count badge
+  const countEl = $('cogs-coverage-count');
+  if (countEl) {
+    const missing = [...result.skus.values()].filter(s => !s.hasCost).length;
+    countEl.textContent = missing
+      ? `· ${missing} of ${result.skus.size} SKUs missing cost`
+      : (result.skus.size ? `· all ${result.skus.size} SKUs covered` : '');
+    countEl.style.color = missing ? 'var(--orange)' : 'var(--qb-green)';
+  }
+  renderCogsCoverageTable();
+}
+
 function wireProductSort() {
   document.querySelectorAll('#products-table thead th').forEach(th => {
     if (th._wired) return;
@@ -2012,6 +2320,26 @@ function wireLeaderboardClick() {
   }
 }
 
+let _leaderboardData = new Map();
+let _leaderboardSort = { col: 'revenue', dir: 'desc' };
+const _leaderboardColDirDefault = { name: 'asc', revenue: 'desc', cogs: 'desc', gp: 'desc', gpPct: 'desc', closePct: 'desc', openCount: 'desc', overdueCount: 'desc', count: 'desc' };
+
+function leaderboardRowValue(name, agg, col) {
+  if (col === 'name') return String(name).toLowerCase();
+  if (col === 'revenue') return agg.revenue || 0;
+  if (col === 'cogs') return agg.cogs || 0;
+  if (col === 'gp') return (agg.revenue || 0) - (agg.cogs || 0);
+  if (col === 'gpPct') return agg.revenue > 0 ? ((agg.revenue - agg.cogs) / agg.revenue) : -Infinity;
+  if (col === 'closePct') {
+    const denom = (agg.paidAmt || 0) + (agg.lostAmt || 0);
+    return denom > 0 ? agg.paidAmt / denom : -Infinity;
+  }
+  if (col === 'openCount') return agg.openCount || 0;
+  if (col === 'overdueCount') return agg.overdueCount || 0;
+  if (col === 'count') return agg.count || 0;
+  return 0;
+}
+
 function renderLeaderboard(rows, classPL) {
   const tbody = $('leaderboard-tbody');
   const emptyStats = () => ({ count: 0, openCount: 0, openBal: 0, overdueCount: 0, overdueBal: 0, paidAmt: 0, lostAmt: 0 });
@@ -2039,7 +2367,36 @@ function renderLeaderboard(rows, classPL) {
   for (const [key, s] of stats) {
     if (!combined.has(key)) combined.set(key, { ...s, revenue: 0, cogs: 0 });
   }
-  const sorted = [...combined.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
+  _leaderboardData = combined;
+  paintLeaderboard();
+}
+
+function paintLeaderboard() {
+  const tbody = $('leaderboard-tbody');
+  if (!tbody) return;
+  const { col, dir } = _leaderboardSort;
+  const sorted = [..._leaderboardData.entries()].sort((a, b) => {
+    const va = leaderboardRowValue(a[0], a[1], col);
+    const vb = leaderboardRowValue(b[0], b[1], col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  // Header sort indicators
+  document.querySelectorAll('#leaderboard-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    let ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.setAttribute('aria-hidden', 'true');
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(ind);
+    }
+    ind.textContent = dir === 'asc' ? '↑' : '↓';
+  });
   if (!sorted.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text2)">No sales in range.</td></tr>';
     return;
@@ -2080,6 +2437,23 @@ function renderLeaderboard(rows, classPL) {
       </tr>
     `;
   }).join('');
+}
+
+function wireLeaderboardSort() {
+  document.querySelectorAll('#leaderboard-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (!col) return;
+      if (_leaderboardSort.col === col) {
+        _leaderboardSort.dir = _leaderboardSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _leaderboardSort = { col, dir: _leaderboardColDirDefault[col] || 'desc' };
+      }
+      paintLeaderboard();
+    });
+  });
 }
 
 function filterByRep(repName) {
@@ -2250,11 +2624,19 @@ function weekEnd(d) { const s = weekStart(d); return new Date(s.getFullYear(), s
 
 function quickRange(kind) {
   const today = new Date();
+  const y = today.getFullYear(), m = today.getMonth(), d = today.getDate();
+  if (kind === 'today') return [today, today];
+  if (kind === 'yesterday') { const ys = new Date(y, m, d - 1); return [ys, ys]; }
   if (kind === 'this-week') return [weekStart(today), weekEnd(today)];
-  if (kind === 'last-week') { const lw = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7); return [weekStart(lw), weekEnd(lw)]; }
-  if (kind === 'this-month') return [new Date(today.getFullYear(), today.getMonth(), 1), new Date(today.getFullYear(), today.getMonth() + 1, 0)];
-  if (kind === 'last-month') return [new Date(today.getFullYear(), today.getMonth() - 1, 1), new Date(today.getFullYear(), today.getMonth(), 0)];
-  if (kind === 'ytd') return [new Date(today.getFullYear(), 0, 1), today];
+  if (kind === 'last-week') { const lw = new Date(y, m, d - 7); return [weekStart(lw), weekEnd(lw)]; }
+  if (kind === 'last-7') return [new Date(y, m, d - 6), today];
+  if (kind === 'this-month') return [new Date(y, m, 1), new Date(y, m + 1, 0)];
+  if (kind === 'last-month') return [new Date(y, m - 1, 1), new Date(y, m, 0)];
+  if (kind === 'last-30') return [new Date(y, m, d - 29), today];
+  if (kind === 'mtd') return [new Date(y, m, 1), today];
+  if (kind === 'qtd') { const qStartMonth = Math.floor(m / 3) * 3; return [new Date(y, qStartMonth, 1), today]; }
+  if (kind === 'ytd') return [new Date(y, 0, 1), today];
+  if (kind === 'last-year') return [new Date(y - 1, 0, 1), new Date(y - 1, 11, 31)];
   return [today, today];
 }
 
@@ -2262,7 +2644,11 @@ function setQuickRange(kind) {
   const [s, e] = quickRange(kind);
   $('filter-start').value = ymd(s);
   $('filter-end').value = ymd(e);
-  document.querySelectorAll('#chip-row .chip').forEach(c => c.classList.toggle('active', c.dataset.range === kind));
+  document.querySelectorAll('#chip-row .chip').forEach(c => {
+    const isActive = c.dataset.range === kind;
+    c.classList.toggle('active', isActive);
+    c.setAttribute('aria-pressed', String(isActive));
+  });
   refreshDashboard();
 }
 
@@ -2346,8 +2732,8 @@ async function refreshDashboard() {
       }));
       buildCustomerHistoryIdx(histRows);
       populateInvoiceRepFilter([...rows, ..._paidInRangeRows]);
-      renderInvoiceActivityKpis(activity, _paidInRangeRows);
-      renderStatusBreakdown(_paidInRangeRows);
+      renderInvoiceActivityKpis(activity);
+      renderStatusBreakdown(_lastRows, _paidInRangeRows);
       renderLeaderboard(_paidInRangeRows, classPL);
       renderAttention(rows);
       renderPivot(_paidInRangeRows);
@@ -2359,6 +2745,7 @@ async function refreshDashboard() {
         (!productFilter || (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter))
       );
       loadTopProducts(paidInvoicesForProducts);
+      loadCogsCoverage(paidInvoicesForProducts);
     })(),
   ]);
 }
@@ -2420,6 +2807,186 @@ async function initCommissionPage() {
   const now = new Date();
   const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   $('comm-month').value = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+  wireCommArchiveSort();
+  wireCommArchiveFilters();
+  showCommArchive();
+  loadCommissionArchive();
+}
+
+// Archive state and helpers
+let _commArchive = { items: [], statusFilter: 'all', repFilter: '', monthFilter: '' };
+let _commArchiveSort = { col: 'updatedAt', dir: 'desc' };
+const _commArchiveColDirDefault = { rep: 'asc', month: 'desc', status: 'asc', rate: 'desc', commissionDue: 'desc', updatedAt: 'desc' };
+
+function commArchiveRowValue(item, col) {
+  if (col === 'rep') return String(item.rep || '').toLowerCase();
+  if (col === 'month') return String(item.month || '');
+  if (col === 'status') return String(item.status || 'draft');
+  if (col === 'rate') return Number(item.rate ?? -1);
+  if (col === 'commissionDue') return Number(item.commissionDue ?? -1);
+  if (col === 'updatedAt') return Number(item.updatedAt || 0);
+  return 0;
+}
+
+async function loadCommissionArchive() {
+  const tbody = $('comm-archive-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
+  try {
+    const res = await fetch('/api/commission?list=1', { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed');
+    const { items } = await res.json();
+    _commArchive.items = items || [];
+    populateCommArchiveSelectors();
+    renderCommArchive();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--red);padding:12px;">Failed to load: ${attrEscape(e.message || '')}</td></tr>`;
+  }
+}
+
+function populateCommArchiveSelectors() {
+  const repSel = $('comm-archive-rep');
+  const monthSel = $('comm-archive-month');
+  if (!repSel || !monthSel) return;
+  const reps = [...new Set(_commArchive.items.map(i => i.rep).filter(Boolean))].sort();
+  const months = [...new Set(_commArchive.items.map(i => i.month).filter(Boolean))].sort((a, b) => b.localeCompare(a));
+  const repCurrent = repSel.value;
+  const monthCurrent = monthSel.value;
+  repSel.innerHTML = '<option value="">All reps</option>' + reps.map(r => `<option value="${attrEscape(r)}">${attrEscape(r)}</option>`).join('');
+  monthSel.innerHTML = '<option value="">All months</option>' + months.map(m => {
+    const label = m ? new Date(m + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }) : m;
+    return `<option value="${attrEscape(m)}">${attrEscape(label)}</option>`;
+  }).join('');
+  if (reps.includes(repCurrent)) repSel.value = repCurrent;
+  if (months.includes(monthCurrent)) monthSel.value = monthCurrent;
+}
+
+function renderCommArchive() {
+  const tbody = $('comm-archive-tbody');
+  const countEl = $('comm-archive-count');
+  if (!tbody) return;
+  const { statusFilter, repFilter, monthFilter, items } = _commArchive;
+  const filtered = items.filter(it => {
+    if (statusFilter !== 'all' && (it.status || 'draft') !== statusFilter) return false;
+    if (repFilter && it.rep !== repFilter) return false;
+    if (monthFilter && it.month !== monthFilter) return false;
+    return true;
+  });
+  const { col, dir } = _commArchiveSort;
+  filtered.sort((a, b) => {
+    const va = commArchiveRowValue(a, col);
+    const vb = commArchiveRowValue(b, col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  document.querySelectorAll('#comm-archive-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    let ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.setAttribute('aria-hidden', 'true');
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(ind);
+    }
+    ind.textContent = dir === 'asc' ? '↑' : '↓';
+  });
+  if (countEl) {
+    const total = items.length;
+    const finals = items.filter(i => i.status === 'final').length;
+    countEl.textContent = total ? `· ${total} report${total === 1 ? '' : 's'} (${finals} final)` : '';
+  }
+  if (!filtered.length) {
+    const total = items.length;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--text2);">${total ? 'No reports match these filters.' : 'No saved reports yet — click <strong>+ New Report</strong> to start.'}</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(it => {
+    const monthLabel = it.month ? new Date(it.month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '—';
+    const updated = it.updatedAt ? new Date(it.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+    const due = (it.commissionDue != null) ? fmt(it.commissionDue) : '<span style="color:var(--text2);">—</span>';
+    const rate = (it.rate != null) ? `${Number(it.rate).toFixed(1)}%` : '<span style="color:var(--text2);">—</span>';
+    const statusCls = (it.status === 'final') ? 'final' : 'draft';
+    const statusLabel = (it.status === 'final') ? 'Final' : 'Draft';
+    return `<tr class="clickable" onclick="openSavedReport('${attrEscape(it.rep)}','${attrEscape(it.month)}')" title="Open this report">
+      <td><strong>${attrEscape(it.rep || '—')}</strong></td>
+      <td>${attrEscape(monthLabel)}</td>
+      <td><span class="status-pill ${statusCls}">${statusLabel}</span></td>
+      <td>${rate}</td>
+      <td><strong>${due}</strong></td>
+      <td>${updated}</td>
+      <td style="color:var(--qb-blue);font-size:1.1rem;">›</td>
+    </tr>`;
+  }).join('');
+}
+
+function wireCommArchiveSort() {
+  document.querySelectorAll('#comm-archive-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (!col) return;
+      if (_commArchiveSort.col === col) {
+        _commArchiveSort.dir = _commArchiveSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _commArchiveSort = { col, dir: _commArchiveColDirDefault[col] || 'desc' };
+      }
+      renderCommArchive();
+    });
+  });
+}
+
+function wireCommArchiveFilters() {
+  document.querySelectorAll('#comm-archive-status .chip').forEach(chip => {
+    if (chip._wired) return;
+    chip._wired = true;
+    chip.addEventListener('click', () => {
+      _commArchive.statusFilter = chip.dataset.statusFilter;
+      document.querySelectorAll('#comm-archive-status .chip').forEach(c => {
+        const a = c === chip;
+        c.classList.toggle('active', a);
+        c.setAttribute('aria-pressed', String(a));
+      });
+      renderCommArchive();
+    });
+  });
+  const repSel = $('comm-archive-rep');
+  if (repSel && !repSel._wired) {
+    repSel._wired = true;
+    repSel.addEventListener('change', () => { _commArchive.repFilter = repSel.value; renderCommArchive(); });
+  }
+  const monthSel = $('comm-archive-month');
+  if (monthSel && !monthSel._wired) {
+    monthSel._wired = true;
+    monthSel.addEventListener('change', () => { _commArchive.monthFilter = monthSel.value; renderCommArchive(); });
+  }
+}
+
+function showCommNewReportForm() {
+  const form = $('comm-new-form');
+  if (form) form.classList.remove('hidden');
+}
+
+function hideCommNewReportForm() {
+  const form = $('comm-new-form');
+  if (form) form.classList.add('hidden');
+}
+
+function showCommArchive() {
+  $('comm-archive')?.classList.remove('hidden');
+  $('comm-editor-header')?.classList.add('hidden');
+  $('comm-report')?.classList.add('hidden');
+  $('comm-empty')?.classList.add('hidden');
+  loadCommissionArchive();
+}
+
+function showCommEditor() {
+  $('comm-archive')?.classList.add('hidden');
+  $('comm-editor-header')?.classList.remove('hidden');
+  hideCommNewReportForm();
 }
 
 function monthBounds(yyyymm) {
@@ -2450,10 +3017,49 @@ async function fetchCreditMemosForRepMonth(rep, startDate, endDate) {
   } catch { return []; }
 }
 
+// Split credit memos into:
+//  - applied: linked to an Invoice (already nets out of cash received — DO NOT deduct)
+//  - standalone: refunds / unattached (real money out — DEDUCT from commission)
+function partitionCreditMemos(memos) {
+  const applied = [];
+  const standalone = [];
+  for (const cm of memos || []) {
+    const links = cm.LinkedTxn || [];
+    const linksToInvoice = links.some(l => l.TxnType === 'Invoice');
+    if (linksToInvoice) applied.push(cm);
+    else standalone.push(cm);
+  }
+  return { applied, standalone };
+}
+
 function isCcMethod(name) {
   if (!name) return false;
   const s = String(name).toLowerCase();
   return /(visa|mastercard|master card|amex|american express|discover|credit|card)/.test(s);
+}
+
+// Detect a CC signal on the invoice itself (custom field).
+// QBO custom fields appear on inv.CustomField[]; look for boolean/string values
+// on a field named like "Credit Card", "CC Paid", "Paid By", etc.
+function invoiceCustomFieldCc(inv) {
+  const fields = inv?.CustomField || [];
+  const nameRe = /(credit\s*card|cc[\s_-]*paid|paid[\s_-]*by)/i;
+  const truthy = (v) => {
+    if (v == null) return false;
+    if (typeof v === 'boolean') return v;
+    const s = String(v).trim().toLowerCase();
+    if (!s) return false;
+    if (s === 'true' || s === 'yes' || s === 'y' || s === '1') return true;
+    if (s === 'false' || s === 'no' || s === 'n' || s === '0') return false;
+    if (/^\d+(?:\.\d+)?$/.test(s)) return Number(s) > 0;
+    if (/(visa|mastercard|amex|american express|discover|credit\s*card)/i.test(s)) return true;
+    return false;
+  };
+  for (const f of fields) {
+    if (!f?.Name || !nameRe.test(String(f.Name))) continue;
+    if (truthy(f.StringValue) || truthy(f.BooleanValue) || truthy(f.NumberValue)) return true;
+  }
+  return false;
 }
 
 function taxFromInvoice(inv) {
@@ -2501,10 +3107,11 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
   const customersInvoices = new Map(); // customer → Set of invoiceIds (for distinct count)
   const shippingRe = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
 
+  const ccMismatches = [];
   for (const pay of payments) {
     const payDate = pay.TxnDate;
     const method = pay.PaymentMethodRef?.name || null;
-    const isCc = isCcMethod(method);
+    const payIsCc = isCcMethod(method);
     let payTouched = false;
 
     for (const line of (pay.Line || [])) {
@@ -2522,6 +3129,11 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
         const invShip = shippingFromInvoice(inv);
         const taxApplied = invTax * ratio;
         const shipApplied = invShip * ratio;
+        const invIsCc = invoiceCustomFieldCc(inv);
+        const isCc = payIsCc || invIsCc;
+        if (payIsCc !== invIsCc && (payIsCc || invIsCc)) {
+          ccMismatches.push({ docNum: inv.DocNumber, payIsCc, invIsCc, method, applied });
+        }
 
         result.revenue += applied;
         result.tax += taxApplied;
@@ -2586,6 +3198,7 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
           taxApplied,
           shippingApplied: shipApplied,
           method,
+          isCc,
         });
       }
     }
@@ -2598,6 +3211,9 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
   result.cogsCoverage = result.revenue > 0 ? (result.revenueWithCost / result.revenue) * 100 : 0;
   result.avgDaysToPay = result.daysToPayN > 0 ? Math.round(result.daysToPaySum / result.daysToPayN) : null;
   result.paymentRows.sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''));
+  if (ccMismatches.length) {
+    console.info(`[commission] CC signal mismatches for ${rep}:`, ccMismatches);
+  }
   return result;
 }
 
@@ -2607,7 +3223,7 @@ function buildAutoDeductions(metrics, ccRate, warrantyRate) {
     { key: 'ccFee',        label: 'Credit card fee',      basis: `Paid via CC (${fmt(metrics.ccPaid)}) × rate`, editableRate: true, rate: ccRate, ccPaid: metrics.ccPaid, autoAmount: metrics.ccPaid * (ccRate / 100) },
     { key: 'warranty',     label: 'Warranty holdback',    basis: 'Revenue × rate', editableRate: true, rate: warrantyRate, ccPaid: 0, autoAmount: metrics.revenue * (warrantyRate / 100) },
     { key: 'shipping',     label: 'Shipping',             basis: 'Sum of shipping/freight line items', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.shipping },
-    { key: 'creditMemos',  label: 'Credit memos (refunds)', basis: 'Sum of credit memos issued this period for this rep', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.creditMemos || 0 },
+    { key: 'creditMemos',  label: 'Credit memos (refunds)', basis: 'Standalone refunds only — applied credits already net out of cash received', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.creditMemos || 0 },
   ];
 }
 
@@ -2617,6 +3233,7 @@ async function loadCommissionReport() {
   if (!rep || !month) { alert('Pick a rep and a month first.'); return; }
   if (isDemoMode) { alert('Commission report is not available in demo mode — connect to QuickBooks to use it.'); return; }
 
+  showCommEditor();
   $('comm-empty').classList.add('hidden');
   $('comm-report').classList.remove('hidden');
   ['comm-revenue','comm-cogs','comm-gp','comm-margin','comm-inv-count','comm-conversion','comm-cogs-coverage','comm-customer-count','comm-base','comm-due'].forEach(id => { const el = $(id); if (el) el.textContent = '…'; });
@@ -2645,10 +3262,15 @@ async function loadCommissionReport() {
     const invoicesById = new Map(allInvoices.map(i => [i.Id, i]));
 
     const metrics = computeCashBasisMetrics(rep, thisPayments, invoicesById, costMap);
-    metrics.creditMemos = creditMemos.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
-    metrics.creditMemoList = creditMemos;
+    const cmThis = partitionCreditMemos(creditMemos);
+    metrics.creditMemos = cmThis.standalone.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
+    metrics.creditMemosAppliedTotal = cmThis.applied.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
+    metrics.creditMemoList = cmThis.standalone;
+    metrics.creditMemoAppliedList = cmThis.applied;
     const lastMetrics = computeCashBasisMetrics(rep, lastPayments, invoicesById, costMap);
-    lastMetrics.creditMemos = lastCreditMemos.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
+    const cmLast = partitionCreditMemos(lastCreditMemos);
+    lastMetrics.creditMemos = cmLast.standalone.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
+    lastMetrics.creditMemosAppliedTotal = cmLast.applied.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
 
     _commissionState = {
       rep, month,
@@ -2666,6 +3288,8 @@ async function loadCommissionReport() {
     const monthLabel = new Date(month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
     $('comm-print-title').textContent = `Commission Report — ${rep}`;
     $('comm-print-period').textContent = `${monthLabel} · generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
+    const editorPeriod = $('comm-editor-period');
+    if (editorPeriod) editorPeriod.textContent = `${rep} · ${monthLabel}`;
 
     renderCommissionSummary(metrics);
     renderDeductionsTable();
@@ -2714,6 +3338,20 @@ function renderDeductionsTable() {
   const tbody = $('comm-deductions-tbody');
   const auto = _commissionState.autoDeductions || [];
   const custom = _commissionState.customDeductions || [];
+  // Applied-credits informational note (already netted out of cash received).
+  const noteEl = $('comm-applied-credits-note');
+  if (noteEl) {
+    const m = _commissionState.metrics || {};
+    const appliedTotal = m.creditMemosAppliedTotal || 0;
+    const appliedCount = (m.creditMemoAppliedList || []).length;
+    if (appliedCount > 0) {
+      noteEl.classList.remove('hidden');
+      noteEl.innerHTML = `<strong style="color:var(--text);">Applied credits:</strong> ${fmt(appliedTotal)} across ${appliedCount} credit memo${appliedCount === 1 ? '' : 's'} were applied to invoices in this period — they already reduce cash received and are <em>not</em> deducted again. Standalone refunds (if any) are deducted in the table below.`;
+    } else {
+      noteEl.classList.add('hidden');
+      noteEl.innerHTML = '';
+    }
+  }
   const dash = '<span style="color:var(--text2);">—</span>';
   const autoRows = auto.map(d => {
     const o = _commissionState.overrides[d.key];
@@ -2726,9 +3364,16 @@ function renderDeductionsTable() {
     const resetBtn = isOverridden
       ? `<button type="button" class="remove-row-btn" onclick="resetAutoOverride('${d.key}')" title="Reset to QBO value">Reset</button>`
       : `<span style="color:var(--text2);font-size:.7rem;">auto</span>`;
-    return `<tr class="auto-row" data-auto-key="${d.key}">
+    // Build formula text for the basis hint
+    let formula = `QBO: ${fmt(d.autoAmount)}`;
+    if (d.key === 'ccFee' && Number(d.rate) > 0) formula = `${Number(d.rate).toFixed(1)}% × ${fmt(d.ccPaid || 0)} = ${fmt(d.autoAmount)}`;
+    else if (d.key === 'warranty' && Number(d.rate) > 0) formula = `${Number(d.rate).toFixed(1)}% × ${fmt(_commissionState.metrics?.revenue || 0)} = ${fmt(d.autoAmount)}`;
+    const hintHtml = isOverridden
+      ? `<div class="auto-hint">QBO: <span style="text-decoration:line-through;">${fmt(d.autoAmount)}</span> · using manual ${fmt(o)}</div>`
+      : `<div class="auto-hint">${formula}</div>`;
+    return `<tr class="auto-row${isOverridden ? ' is-overridden' : ''}" data-auto-key="${d.key}">
       <td class="auto-label">${attrEscape(d.label)}${overrideMark}</td>
-      <td class="basis-cell">${attrEscape(d.basis)}<div class="auto-hint">QBO: ${fmt(d.autoAmount)}</div></td>
+      <td class="basis-cell">${attrEscape(d.basis)}${hintHtml}</td>
       <td>${rateCell}</td>
       <td><input type="number" step="0.01" value="${Number(effective).toFixed(2)}" data-auto-amount-key="${d.key}" oninput="onAutoAmountChange(this)" aria-label="${attrEscape(d.label)} amount"></td>
       <td>${resetBtn}</td>
@@ -2823,8 +3468,11 @@ function recomputeCommission() {
   const base = m.gp - total;
   const rate = Number($('comm-rate').value) || 0;
   const due = base * (rate / 100);
+  _commissionState.currentDue = due;
   $('comm-base').textContent = fmt(base);
   $('comm-due').textContent = fmt(due);
+  const printDue = $('comm-print-due');
+  if (printDue) printDue.textContent = fmt(due);
 }
 
 async function saveCommissionConfig(opts = {}) {
@@ -2847,6 +3495,7 @@ async function saveCommissionConfig(opts = {}) {
     status: opts.status || _commissionState.status || 'draft',
     overrides: _commissionState.overrides,
     deductions: cleanCustom,
+    commissionDue: Number.isFinite(_commissionState.currentDue) ? _commissionState.currentDue : null,
   };
   try {
     const res = await fetch('/api/commission', {
@@ -2897,50 +3546,36 @@ function renderStatusPill() {
     finalizeBtn.style.color = status === 'final' ? 'var(--orange)' : 'var(--qb-green)';
     finalizeBtn.style.borderColor = status === 'final' ? 'var(--orange)' : 'var(--qb-green)';
   }
-}
-
-async function toggleSavedDrawer() {
-  const drawer = $('comm-saved-drawer');
-  if (drawer.classList.contains('hidden')) {
-    drawer.classList.remove('hidden');
-    await loadSavedReportsList();
-  } else {
-    drawer.classList.add('hidden');
+  // Print-only mirror of status
+  const printPill = $('comm-print-status');
+  if (printPill) {
+    printPill.classList.remove('draft', 'final');
+    printPill.classList.add(status);
+    printPill.textContent = status === 'final' ? 'FINAL' : 'DRAFT';
   }
-}
-
-async function loadSavedReportsList() {
-  const list = $('comm-saved-list');
-  list.innerHTML = '<div class="loading-overlay"><div class="spinner"></div>Loading…</div>';
-  try {
-    const res = await fetch('/api/commission?list=1', { credentials: 'include' });
-    if (!res.ok) throw new Error('Failed');
-    const { items } = await res.json();
-    if (!items.length) {
-      list.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">No saved reports yet.</div>';
-      return;
-    }
-    items.sort((a, b) => (b.month || '').localeCompare(a.month || '') || (a.rep || '').localeCompare(b.rep || ''));
-    list.innerHTML = items.map(item => {
-      const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
-      const monthLabel = item.month ? new Date(item.month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '—';
-      return `<div class="saved-item" onclick="openSavedReport('${attrEscape(item.rep)}','${attrEscape(item.month)}')">
-        <div>
-          <div class="label">${attrEscape(item.rep)}</div>
-          <div class="meta">${attrEscape(monthLabel)} · saved ${updated}</div>
-        </div>
-        <span class="status-pill ${item.status === 'final' ? 'final' : 'draft'}">${item.status === 'final' ? 'Final' : 'Draft'}</span>
-      </div>`;
-    }).join('');
-  } catch (e) {
-    list.innerHTML = '<div style="color:var(--red);padding:12px;">Failed to load: ' + attrEscape(e.message || '') + '</div>';
+  const signoff = $('comm-print-signoff');
+  if (signoff) {
+    // Show sign-off only when finalized (cleaner for finalized handoff)
+    signoff.style.display = status === 'final' ? '' : 'none';
+  }
+  const footer = $('comm-print-footer');
+  if (footer) {
+    const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    footer.textContent = `Generated from QBO data on ${today} · cash basis · status: ${status.toUpperCase()}`;
   }
 }
 
 function openSavedReport(rep, month) {
-  $('comm-rep').value = rep;
+  // Ensure rep dropdown has the option (rep set may have changed)
+  const repSel = $('comm-rep');
+  if (repSel && ![...repSel.options].some(o => o.value === rep)) {
+    const opt = document.createElement('option');
+    opt.value = rep;
+    opt.textContent = rep;
+    repSel.appendChild(opt);
+  }
+  if (repSel) repSel.value = rep;
   $('comm-month').value = month;
-  $('comm-saved-drawer').classList.add('hidden');
   loadCommissionReport();
 }
 
@@ -2955,9 +3590,10 @@ function renderCommissionInvoicesTable(metrics) {
     const onclick = url ? `onclick="openInvoiceInQb('${r.id}')"` : '';
     const cls = url ? 'clickable' : '';
     const partial = r.applied < r.invoiceTotal - 0.01;
+    const ccBadge = r.isCc ? ' <span class="cc-pill" title="Paid by credit card">CC</span>' : '';
     return `<tr class="${cls}" ${onclick} title="Click to open invoice in QuickBooks">
       <td><strong>${r.paymentDate || '—'}</strong></td>
-      <td>${attrEscape(r.docNum || '—')}</td>
+      <td>${attrEscape(r.docNum || '—')}${ccBadge}</td>
       <td>${r.invoiceDate || '—'}</td>
       <td>${attrEscape(r.customer || '—')}</td>
       <td>${fmt(r.invoiceTotal)}</td>
