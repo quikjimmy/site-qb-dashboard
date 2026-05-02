@@ -430,6 +430,14 @@
       <button data-page="commission" onclick="showPage('commission')">Commission</button>
     </div>
 
+    <!-- Real-time payment pulse — independent of filter range -->
+    <div class="kpi-strip" aria-label="Payment activity (today / this week / this month — not affected by date filter)" style="position:relative;">
+      <div style="position:absolute;top:-9px;left:14px;background:var(--card);padding:0 8px;font-size:.62rem;letter-spacing:.6px;text-transform:uppercase;color:var(--text2);font-weight:600;">Live cash pulse · not filtered</div>
+      <div class="item"><div class="label">Paid Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
+      <div class="item"><div class="label">Paid This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
+      <div class="item"><div class="label">Paid This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
+    </div>
+
     <!-- Shared filters -->
     <div class="filters">
       <label>Start Date<input type="date" id="filter-start"></label>
@@ -460,16 +468,9 @@
       <!-- Financial KPIs (headline + supporting) -->
       <div class="kpi-grid">
         <div class="kpi-card profit headline"><div class="label">Gross Profit</div><div class="value" id="kpi-profit">—</div><div class="sub" id="kpi-profit-sub"></div></div>
-        <div class="kpi-card revenue"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
+        <div class="kpi-card revenue"><div class="label">Total Revenue · Gross</div><div class="value" id="kpi-revenue">—</div><div class="sub" id="kpi-revenue-sub"></div></div>
         <div class="kpi-card cogs"><div class="label">Total COGS</div><div class="value" id="kpi-cogs">—</div><div class="sub" id="kpi-cogs-sub"></div></div>
         <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
-      </div>
-
-      <!-- Payment activity strip (cash-basis) -->
-      <div class="kpi-strip" aria-label="Payment activity">
-        <div class="item"><div class="label">Paid Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
-        <div class="item"><div class="label">Paid This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
-        <div class="item"><div class="label">Paid This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
       </div>
 
       <!-- Status breakdown -->
@@ -492,7 +493,7 @@
         </div>
         <div class="status-card paid">
           <div class="left">
-            <div class="label">Paid Invoices</div>
+            <div class="label">Paid Invoices · Gross</div>
             <div class="value" id="status-paid-amt">—</div>
             <div class="sub" id="status-paid-sub">—</div>
           </div>
@@ -560,6 +561,10 @@
       <!-- COGS Coverage table — data quality drill-down -->
       <details class="table-card" id="cogs-coverage-details">
         <summary><h3>COGS Coverage <span id="cogs-coverage-count" style="color:var(--text2);font-weight:500;"></span> <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· line items in paid invoices · click rows to see invoices</span></h3></summary>
+        <div class="chip-row" id="cogs-coverage-filter" role="group" aria-label="COGS filter" style="margin-top:8px;">
+          <button class="chip active" data-cogs-filter="missing" aria-pressed="true">Missing cost only</button>
+          <button class="chip" data-cogs-filter="all" aria-pressed="false">All SKUs</button>
+        </div>
         <div class="table-wrap">
           <table class="sortable-table" id="cogs-coverage-table">
             <thead><tr>
@@ -1024,7 +1029,7 @@ function syncViewToggleUI() {
     b.classList.toggle('active', active);
     b.setAttribute('aria-pressed', String(active));
   });
-  $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Revenue by Week · Mon–Sun' : 'Revenue by Month';
+  $('revenue-chart-title').textContent = _viewMode === 'weekly' ? 'Gross Revenue by Week · Mon–Sun · gross cash received' : 'Gross Revenue by Month · gross cash received';
 }
 
 function wireAttentionFilters() {
@@ -1554,6 +1559,9 @@ async function loadMonthlyPL(endDate) {
   return { labels: months.map(m => m.label), income, cogs };
 }
 
+// Net P&L numbers (cash-basis Income excludes tax + shipping). Used for COGS,
+// GP, and the "net rev" sub-line. Gross revenue (which the KPI tile shows) is
+// computed elsewhere from the gross paid amounts.
 async function loadKPIs(startDate, endDate) {
   try {
     const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Total&accounting_method=Cash`);
@@ -1562,12 +1570,33 @@ async function loadKPIs(startDate, endDate) {
     const cogs = Math.abs(findPLSection(rows, ['Total Cost of Goods Sold'])?.[0] || 0);
     const profit = income - cogs;
     const margin = income > 0 ? (profit / income) * 100 : 0;
-    $('kpi-revenue').textContent = fmt(income);
+    // Stash net values; renderHeadlineKpis will fill the cards once gross is known.
+    _netKpis = { income, cogs, profit, margin };
     $('kpi-cogs').textContent = fmt(cogs);
     $('kpi-profit').textContent = fmt(profit);
+    $('kpi-profit-sub').textContent = 'Net rev − COGS';
     $('kpi-margin').textContent = pct(margin);
+    $('kpi-margin-sub').textContent = 'of net revenue';
   } catch (e) {
     showError('Could not load KPIs: ' + (e.message || e));
+  }
+}
+
+let _netKpis = { income: 0, cogs: 0, profit: 0, margin: 0 };
+
+// Render the gross-revenue headline once paid-in-range rows are computed.
+// Sub-line surfaces the net (P&L Income) figure so the user always sees both.
+function renderHeadlineRevenue(paidRows) {
+  const gross = (paidRows || []).reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
+  const net = _netKpis.income || 0;
+  const passThrough = gross - net;
+  $('kpi-revenue').textContent = fmt(gross);
+  if (gross > 0 && passThrough > 0) {
+    $('kpi-revenue-sub').innerHTML = `Gross · incl. ${fmt(passThrough)} tax/shipping <span style="color:var(--text2);">· net ${fmt(net)}</span>`;
+  } else if (gross > 0) {
+    $('kpi-revenue-sub').textContent = 'Gross cash received';
+  } else {
+    $('kpi-revenue-sub').textContent = '';
   }
 }
 
@@ -1625,12 +1654,77 @@ async function loadWeeklyPL(endDate) {
   }
 }
 
+// Gross revenue by month — sums payment lines (gross cash received including
+// tax + shipping pass-through) so the chart matches the Total Revenue (gross)
+// headline KPI.
+async function loadMonthlyGross(endDate) {
+  const months = lastMonths(endDate, 6);
+  const startStr = months[0].start;
+  const endStr = months[months.length - 1].end;
+  try {
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startStr}' AND TxnDate <= '${endStr}' MAXRESULTS 1000`);
+    const buckets = months.map(m => ({ ...m, gross: 0 }));
+    for (const p of data?.Payment || []) {
+      const date = p.TxnDate;
+      if (!date) continue;
+      const i = buckets.findIndex(m => date >= m.start && date <= m.end);
+      if (i < 0) continue;
+      const amt = Number(p.TotalAmt);
+      if (Number.isFinite(amt) && amt > 0) {
+        buckets[i].gross += amt;
+      } else {
+        for (const line of (p.Line || [])) buckets[i].gross += Number(line.Amount) || 0;
+      }
+    }
+    return { labels: buckets.map(b => b.label), income: buckets.map(b => b.gross) };
+  } catch {
+    return { labels: months.map(m => m.label), income: months.map(() => 0) };
+  }
+}
+
+async function loadWeeklyGross(endDate) {
+  const end = new Date(endDate);
+  const endDay = end.getDay();
+  const daysToSunday = endDay === 0 ? 0 : 7 - endDay;
+  const weekEnd = new Date(end.getFullYear(), end.getMonth(), end.getDate() + daysToSunday);
+  const weeks = 8;
+  const start = new Date(weekEnd.getFullYear(), weekEnd.getMonth(), weekEnd.getDate() - weeks * 7 + 1);
+  const startStr = ymd(start);
+  const endStr = ymd(weekEnd);
+  try {
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startStr}' AND TxnDate <= '${endStr}' MAXRESULTS 1000`);
+    const buckets = Array.from({ length: weeks }, (_, w) => {
+      const mon = new Date(start.getFullYear(), start.getMonth(), start.getDate() + w * 7);
+      return { monday: mon, gross: 0 };
+    });
+    for (const p of data?.Payment || []) {
+      const date = p.TxnDate;
+      if (!date) continue;
+      const d = new Date(date + 'T00:00:00');
+      const w = Math.floor((d - start) / (86400000 * 7));
+      if (w < 0 || w >= buckets.length) continue;
+      const amt = Number(p.TotalAmt);
+      if (Number.isFinite(amt) && amt > 0) {
+        buckets[w].gross += amt;
+      } else {
+        for (const line of (p.Line || [])) buckets[w].gross += Number(line.Amount) || 0;
+      }
+    }
+    return {
+      labels: buckets.map(b => 'Wk ' + b.monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })),
+      income: buckets.map(b => b.gross),
+    };
+  } catch {
+    return { labels: [], income: [] };
+  }
+}
+
 async function loadRevenueChart(endDate) {
   try {
-    const data = _viewMode === 'weekly' ? await loadWeeklyPL(endDate) : await loadMonthlyPL(endDate);
-    renderBarChart('chart-revenue', data.labels, data.income, 'Revenue', '#28efce');
+    const data = _viewMode === 'weekly' ? await loadWeeklyGross(endDate) : await loadMonthlyGross(endDate);
+    renderBarChart('chart-revenue', data.labels, data.income, 'Gross Revenue', '#28efce');
   } catch {
-    renderBarChart('chart-revenue', ['No data'], [0], 'Revenue', '#28efce');
+    renderBarChart('chart-revenue', ['No data'], [0], 'Gross Revenue', '#28efce');
   }
 }
 
@@ -1918,8 +2012,9 @@ function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
 // Renderers driven by shared invoice data
 
 // Open / Overdue use invoices CREATED in range with Balance > 0.
-// Paid uses cash-received-in-range (paid-in-range rows), net of tax + shipping
-// so it ties out to Total Revenue (QBO P&L cash-basis Income).
+// Paid uses gross cash received in range (so it matches Total Revenue · Gross
+// and the Revenue by Month chart). Sub-line shows the net (excl. tax/shipping)
+// figure for context.
 // These three are intentionally on different data sources so Open/Overdue
 // don't double-count revenue that's already collected.
 function renderStatusBreakdown(createdRows, paidRows) {
@@ -1928,9 +2023,9 @@ function renderStatusBreakdown(createdRows, paidRows) {
   const overdue = createdRows.filter(r => r.balance > 0 && r.dueDate && new Date(r.dueDate) < today);
   const openTotal = open.reduce((s, r) => s + r.balance, 0);
   const overdueTotal = overdue.reduce((s, r) => s + r.balance, 0);
-  const paidTotal = paidRows.reduce((s, r) => s + (Number(r.netPaid) || 0), 0);
   const grossPaid = paidRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
-  const passThrough = grossPaid - paidTotal; // tax + shipping
+  const netPaid = paidRows.reduce((s, r) => s + (Number(r.netPaid) || 0), 0);
+  const passThrough = grossPaid - netPaid; // tax + shipping
   const overdueDays = overdue.reduce((s, r) => s + Math.max(0, Math.floor((today - new Date(r.dueDate)) / 86400000)), 0);
   const avgOverdue = overdue.length ? Math.round(overdueDays / overdue.length) : 0;
   const inv = n => `${n} invoice${n === 1 ? '' : 's'}`;
@@ -1938,9 +2033,9 @@ function renderStatusBreakdown(createdRows, paidRows) {
   $('status-open-sub').textContent = open.length ? inv(open.length) : 'no open invoices';
   $('status-overdue-amt').textContent = fmt(overdueTotal);
   $('status-overdue-sub').textContent = overdue.length ? `${inv(overdue.length)} · avg ${avgOverdue}d late` : 'none past due';
-  $('status-paid-amt').textContent = fmt(paidTotal);
+  $('status-paid-amt').textContent = fmt(grossPaid);
   $('status-paid-sub').textContent = paidRows.length
-    ? `${inv(paidRows.length)} · ${fmt(grossPaid)} cash collected (incl. ${fmt(passThrough)} tax/shipping)`
+    ? `${inv(paidRows.length)} · gross · net ${fmt(netPaid)} (excl. ${fmt(passThrough)} tax/shipping)`
     : 'no payments';
   const createdTotal = Math.max(1, createdRows.length);
   const paidVisualTotal = Math.max(1, paidRows.length);
@@ -2176,7 +2271,10 @@ function cogsCoverageRowValue(name, sku, col) {
 function renderCogsCoverageTable() {
   const tbody = $('cogs-coverage-tbody');
   if (!tbody) return;
-  const skus = [...(_cogsCoverageState.skus || new Map()).entries()];
+  let skus = [...(_cogsCoverageState.skus || new Map()).entries()];
+  if (_cogsCoverageFilter === 'missing') {
+    skus = skus.filter(([, s]) => !s.hasCost);
+  }
   const { col, dir } = _cogsCoverageSort;
   skus.sort((a, b) => {
     // Always surface missing-cost rows first, then apply requested sort
@@ -2204,7 +2302,10 @@ function renderCogsCoverageTable() {
     ind.textContent = dir === 'asc' ? '↑' : '↓';
   });
   if (!skus.length) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2);">No paid invoices with product lines in this range.</td></tr>';
+    const empty = _cogsCoverageFilter === 'missing'
+      ? `<span style="color:var(--qb-green);font-weight:600;">All SKUs have cost data ✓</span> — switch to “All SKUs” to see the full list.`
+      : 'No paid invoices with product lines in this range.';
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;">${empty}</td></tr>`;
     return;
   }
   const dash = '<span style="color:var(--text2);">—</span>';
@@ -2256,12 +2357,43 @@ function wireCogsCoverageSort() {
       renderCogsCoverageTable();
     });
   });
+  // Filter chips
+  document.querySelectorAll('#cogs-coverage-filter .chip').forEach(chip => {
+    if (chip._wired) return;
+    chip._wired = true;
+    chip.addEventListener('click', () => {
+      _cogsCoverageFilter = chip.dataset.cogsFilter;
+      _cogsCoverageState._filterUserSet = true;
+      document.querySelectorAll('#cogs-coverage-filter .chip').forEach(c => {
+        const a = c === chip;
+        c.classList.toggle('active', a);
+        c.setAttribute('aria-pressed', String(a));
+      });
+      renderCogsCoverageTable();
+    });
+  });
+  // Remember if user toggled the details so we don't re-open it on every refresh
+  const detailsEl = $('cogs-coverage-details');
+  if (detailsEl && !detailsEl._wired) {
+    detailsEl._wired = true;
+    detailsEl.addEventListener('toggle', () => { detailsEl.dataset.userToggled = '1'; });
+  }
 }
 
-function loadCogsCoverage(paidInvoices) {
-  const costMap = _itemCostMap || new Map();
-  const result = computeCogsCoverage(paidInvoices, costMap);
+let _cogsCoverageFilter = 'missing'; // 'missing' | 'all'
+
+async function loadCogsCoverage(paidInvoices) {
+  // Make sure the item cost map has resolved before computing coverage —
+  // otherwise we incorrectly flag every line as "no cost" on cold loads.
+  const costMap = await loadItemCostMap();
+  const result = computeCogsCoverage(paidInvoices || [], costMap);
   _cogsCoverageState = result;
+  const missingCount = [...result.skus.values()].filter(s => !s.hasCost).length;
+  // Default the filter: if we have missing items, focus there. Once user
+  // toggles, we respect their choice within the session.
+  if (!_cogsCoverageState._filterUserSet) {
+    _cogsCoverageFilter = missingCount > 0 ? 'missing' : 'all';
+  }
   // Update COGS KPI sub-line: % of line items with cost data.
   const sub = $('kpi-cogs-sub');
   const detailsEl = $('cogs-coverage-details');
@@ -2274,7 +2406,11 @@ function loadCogsCoverage(paidInvoices) {
     } else {
       const linePct = (result.linesWithCost / result.totalLines) * 100;
       const color = linePct >= 90 ? 'var(--qb-green)' : linePct >= 60 ? 'var(--orange)' : 'var(--red)';
-      sub.innerHTML = `<span style="color:${color};font-weight:600;">${linePct.toFixed(0)}% complete</span> · ${result.linesWithCost} of ${result.totalLines} lines have cost data <span style="text-decoration:underline;color:var(--text2);">view</span>`;
+      const missingLines = result.totalLines - result.linesWithCost;
+      const tail = missingLines > 0
+        ? `<span style="color:var(--orange);">· ${missingLines} line${missingLines === 1 ? '' : 's'} need cost</span> <span style="text-decoration:underline;color:var(--text2);">view</span>`
+        : `<span style="text-decoration:underline;color:var(--text2);">view</span>`;
+      sub.innerHTML = `<span style="color:${color};font-weight:600;">${linePct.toFixed(0)}% complete</span> · ${result.linesWithCost} of ${result.totalLines} lines have cost data ${tail}`;
       sub.style.cursor = 'pointer';
       sub.title = 'Click to inspect SKUs missing cost data';
       sub.onclick = () => {
@@ -2285,15 +2421,24 @@ function loadCogsCoverage(paidInvoices) {
       };
     }
   }
+  // Auto-expand drill-down when there are missing items so the user can't miss them
+  if (detailsEl && missingCount > 0 && !detailsEl.dataset.userToggled) {
+    detailsEl.open = true;
+  }
   // Header count badge
   const countEl = $('cogs-coverage-count');
   if (countEl) {
-    const missing = [...result.skus.values()].filter(s => !s.hasCost).length;
-    countEl.textContent = missing
-      ? `· ${missing} of ${result.skus.size} SKUs missing cost`
+    countEl.textContent = missingCount
+      ? `· ${missingCount} of ${result.skus.size} SKUs missing cost`
       : (result.skus.size ? `· all ${result.skus.size} SKUs covered` : '');
-    countEl.style.color = missing ? 'var(--orange)' : 'var(--qb-green)';
+    countEl.style.color = missingCount ? 'var(--orange)' : 'var(--qb-green)';
   }
+  // Sync filter chip pressed states
+  document.querySelectorAll('#cogs-coverage-filter .chip').forEach(c => {
+    const active = c.dataset.cogsFilter === _cogsCoverageFilter;
+    c.classList.toggle('active', active);
+    c.setAttribute('aria-pressed', String(active));
+  });
   renderCogsCoverageTable();
 }
 
@@ -2745,6 +2890,7 @@ async function refreshDashboard() {
       buildCustomerHistoryIdx(histRows);
       populateInvoiceRepFilter([...rows, ..._paidInRangeRows]);
       renderInvoiceActivityKpis(activity);
+      renderHeadlineRevenue(_paidInRangeRows);
       renderStatusBreakdown(_lastRows, _paidInRangeRows);
       renderLeaderboard(_paidInRangeRows, classPL);
       renderAttention(rows);
