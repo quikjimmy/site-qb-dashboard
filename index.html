@@ -590,7 +590,7 @@
     <div id="page-commission" class="hidden">
       <div class="table-card">
         <h3>Commission Report <span id="comm-status-pill" class="status-pill draft hidden">Draft</span></h3>
-        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month. Auto-pulled from QBO; deductions, rate, and status persist.</p>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month — <strong>cash basis</strong>: based on the date payments were received, not invoice creation date. Includes partial payments (prorated tax/shipping/COGS).</p>
         <div class="filters">
           <label>Rep<select id="comm-rep"><option value="">Select…</option></select></label>
           <label>Month<input type="month" id="comm-month"></label>
@@ -617,8 +617,8 @@
         </div>
 
         <div class="kpi-strip">
-          <div class="item"><div class="label">Invoices</div><div class="value" id="comm-inv-count">—</div><div class="sub" id="comm-inv-count-sub"></div></div>
-          <div class="item"><div class="label">Sales Conversion</div><div class="value" id="comm-conversion">—</div><div class="sub" id="comm-conversion-sub"></div></div>
+          <div class="item"><div class="label">Invoices Paid</div><div class="value" id="comm-inv-count">—</div><div class="sub" id="comm-inv-count-sub"></div></div>
+          <div class="item"><div class="label">Avg Days to Pay</div><div class="value" id="comm-conversion">—</div><div class="sub" id="comm-conversion-sub"></div></div>
           <div class="item"><div class="label">COGS Coverage</div><div class="value" id="comm-cogs-coverage">—</div><div class="sub" id="comm-cogs-coverage-sub">% of revenue with item cost</div></div>
           <div class="item"><div class="label">Customers</div><div class="value" id="comm-customer-count">—</div><div class="sub" id="comm-customer-count-sub"></div></div>
         </div>
@@ -664,15 +664,15 @@
 
         <!-- Customer Reference -->
         <div class="table-card">
-          <h3>Customer Reference <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· vs prior month</span></h3>
+          <h3>Customer Reference <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· based on payment date · vs prior month</span></h3>
           <div class="table-wrap">
             <table>
               <thead><tr>
                 <th>Customer</th>
-                <th>Invoices</th>
-                <th>Total $</th>
-                <th>Avg $</th>
-                <th>Last Month $</th>
+                <th>Invoices Paid</th>
+                <th>Total Paid $</th>
+                <th>Avg Paid $</th>
+                <th>Last Month Paid $</th>
                 <th>Δ $</th>
                 <th>Δ %</th>
               </tr></thead>
@@ -681,19 +681,21 @@
           </div>
         </div>
 
-        <!-- Invoices in Period -->
+        <!-- Payments in Period -->
         <div class="table-card">
-          <h3>Invoices in Period <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· click to open in QBO</span></h3>
+          <h3>Payments in Period <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· each row = one payment applied to one invoice; click to open invoice in QBO</span></h3>
           <div class="table-wrap">
             <table>
               <thead><tr>
-                <th>Date</th>
+                <th>Pay Date</th>
                 <th>Invoice #</th>
+                <th>Invoice Date</th>
                 <th>Customer</th>
-                <th>Amount</th>
+                <th>Invoice Total</th>
+                <th>Applied $</th>
                 <th>Tax</th>
                 <th>Shipping</th>
-                <th>Status</th>
+                <th>Method</th>
               </tr></thead>
               <tbody id="comm-invoices-tbody"></tbody>
             </table>
@@ -2230,9 +2232,11 @@ function priorMonthBounds(yyyymm) {
   return [ymd(start), ymd(end)];
 }
 
-async function fetchInvoicesForRepMonth(rep, startDate, endDate) {
-  const all = await loadAllInvoices(startDate, endDate);
-  return all.filter(inv => inv.ClassRef?.name === rep);
+async function fetchPaymentsForMonth(startDate, endDate) {
+  try {
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    return data?.Payment || [];
+  } catch { return []; }
 }
 
 function isCcMethod(name) {
@@ -2266,84 +2270,115 @@ function shippingFromInvoice(inv) {
   return total;
 }
 
-function computeCommissionMetrics(rep, invoices, paymentMap, costMap) {
+function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
   const result = {
-    invoiceCount: invoices.length,
+    invoiceCount: 0,
+    paymentCount: 0,
     revenue: 0,
     tax: 0,
     cogs: 0,
     revenueWithCost: 0,
-    paid: 0,
-    open: 0,
-    overdue: 0,
-    ccPaid: 0,
     shipping: 0,
-    customers: new Map(),
-    skus: new Map(),       // name → { qty, revenue, hasCost, unitCost }
-    invoiceRows: [],       // [{id, date, docNum, customer, amount, balance, tax, shipping, status, paymentMethod}]
+    ccPaid: 0,
+    daysToPaySum: 0,
+    daysToPayN: 0,
+    customers: new Map(),     // name → { count: distinct invoices, total }
+    skus: new Map(),
+    paymentRows: [],          // [{id, paymentDate, invoiceDate, docNum, customer, invoiceTotal, applied, taxApplied, shippingApplied, method}]
   };
-  const today = new Date();
-  for (const inv of invoices) {
-    const total = Number(inv.TotalAmt) || 0;
-    const balance = Number(inv.Balance) || 0;
-    const tax = taxFromInvoice(inv);
-    const ship = shippingFromInvoice(inv);
-    const status = balance <= 0 && total > 0 ? 'paid' : (inv.DueDate && new Date(inv.DueDate) < today && balance > 0 ? 'overdue' : 'open');
-    const method = paymentMap.get(inv.Id);
+  const invoicesSeen = new Set();
+  const customersInvoices = new Map(); // customer → Set of invoiceIds (for distinct count)
+  const shippingRe = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
 
-    result.revenue += total;
-    result.tax += tax;
-    result.shipping += ship;
-    if (status === 'paid') result.paid += total;
-    else if (status === 'overdue') result.overdue += balance;
-    else result.open += balance;
-    if (status === 'paid' && isCcMethod(method)) result.ccPaid += total;
+  for (const pay of payments) {
+    const payDate = pay.TxnDate;
+    const method = pay.PaymentMethodRef?.name || null;
+    const isCc = isCcMethod(method);
+    let payTouched = false;
 
-    // Per-line accounting (COGS + SKU diagnostic)
-    const shippingRe = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
-    for (const line of (inv.Line || [])) {
-      if (line.DetailType !== 'SalesItemLineDetail') continue;
-      const name = line.SalesItemLineDetail?.ItemRef?.name;
-      if (!name) continue;
-      if (shippingRe.test(name)) continue;
-      const amount = Number(line.Amount) || 0;
-      const qty = Number(line.SalesItemLineDetail?.Qty) || 0;
-      const unitCost = costMap?.get(name) || 0;
-      if (unitCost > 0) {
-        result.cogs += unitCost * qty;
-        result.revenueWithCost += amount;
+    for (const line of (pay.Line || [])) {
+      const applied = Number(line.Amount) || 0;
+      if (applied === 0) continue;
+      for (const ltxn of (line.LinkedTxn || [])) {
+        if (ltxn.TxnType !== 'Invoice') continue;
+        const inv = invoicesById.get(ltxn.TxnId);
+        if (!inv) continue;
+        if (inv.ClassRef?.name !== rep) continue;
+
+        const invTotal = Number(inv.TotalAmt) || 0;
+        const ratio = invTotal > 0 ? applied / invTotal : 0;
+        const invTax = taxFromInvoice(inv);
+        const invShip = shippingFromInvoice(inv);
+        const taxApplied = invTax * ratio;
+        const shipApplied = invShip * ratio;
+
+        result.revenue += applied;
+        result.tax += taxApplied;
+        result.shipping += shipApplied;
+        if (isCc) result.ccPaid += applied;
+        invoicesSeen.add(ltxn.TxnId);
+        payTouched = true;
+
+        // Days to pay
+        if (payDate && inv.TxnDate) {
+          const days = Math.max(0, Math.round((new Date(payDate) - new Date(inv.TxnDate)) / 86400000));
+          result.daysToPaySum += days;
+          result.daysToPayN += 1;
+        }
+
+        // Prorated COGS + SKU diagnostic
+        for (const lline of (inv.Line || [])) {
+          if (lline.DetailType !== 'SalesItemLineDetail') continue;
+          const name = lline.SalesItemLineDetail?.ItemRef?.name;
+          if (!name || shippingRe.test(name)) continue;
+          const lineAmt = Number(lline.Amount) || 0;
+          const lineQty = Number(lline.SalesItemLineDetail?.Qty) || 0;
+          const unitCost = costMap?.get(name) || 0;
+          const proratedAmt = lineAmt * ratio;
+          const proratedQty = lineQty * ratio;
+          if (unitCost > 0) {
+            result.cogs += unitCost * proratedQty;
+            result.revenueWithCost += proratedAmt;
+          }
+          const sku = result.skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0 };
+          sku.qty += proratedQty;
+          sku.revenue += proratedAmt;
+          if (unitCost > 0) { sku.hasCost = true; sku.unitCost = unitCost; }
+          result.skus.set(name, sku);
+        }
+
+        const customer = inv.CustomerRef?.name || 'Unknown';
+        let custInvSet = customersInvoices.get(customer);
+        if (!custInvSet) { custInvSet = new Set(); customersInvoices.set(customer, custInvSet); }
+        custInvSet.add(ltxn.TxnId);
+        const c = result.customers.get(customer) || { count: 0, total: 0 };
+        c.count = custInvSet.size;
+        c.total += applied;
+        result.customers.set(customer, c);
+
+        result.paymentRows.push({
+          id: inv.Id,
+          paymentDate: payDate,
+          invoiceDate: inv.TxnDate,
+          docNum: inv.DocNumber,
+          customer,
+          invoiceTotal: invTotal,
+          applied,
+          taxApplied,
+          shippingApplied: shipApplied,
+          method,
+        });
       }
-      const sku = result.skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0 };
-      sku.qty += qty;
-      sku.revenue += amount;
-      if (unitCost > 0) { sku.hasCost = true; sku.unitCost = unitCost; }
-      result.skus.set(name, sku);
     }
-
-    const cust = inv.CustomerRef?.name || 'Unknown';
-    const c = result.customers.get(cust) || { count: 0, total: 0 };
-    c.count++;
-    c.total += total;
-    result.customers.set(cust, c);
-
-    result.invoiceRows.push({
-      id: inv.Id,
-      date: inv.TxnDate,
-      docNum: inv.DocNumber,
-      customer: cust,
-      amount: total,
-      balance,
-      tax,
-      shipping: ship,
-      status,
-      paymentMethod: method || null,
-    });
+    if (payTouched) result.paymentCount += 1;
   }
+
+  result.invoiceCount = invoicesSeen.size;
   result.gp = result.revenue - result.cogs;
   result.gpMargin = result.revenue > 0 ? (result.gp / result.revenue) * 100 : 0;
-  result.conversion = result.revenue > 0 ? (result.paid / result.revenue) * 100 : 0;
   result.cogsCoverage = result.revenue > 0 ? (result.revenueWithCost / result.revenue) * 100 : 0;
-  result.invoiceRows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  result.avgDaysToPay = result.daysToPayN > 0 ? Math.round(result.daysToPaySum / result.daysToPayN) : null;
+  result.paymentRows.sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || ''));
   return result;
 }
 
@@ -2372,18 +2407,23 @@ async function loadCommissionReport() {
 
   const [start, end] = monthBounds(month);
   const [pStart, pEnd] = priorMonthBounds(month);
+  // Wide invoice window so we can resolve linked invoices for every payment in either month
+  const lookback = new Date(pStart);
+  lookback.setMonth(lookback.getMonth() - 18);
+  const lookbackStr = ymd(lookback);
 
   try {
-    const [thisInvoices, lastInvoices, paymentMap, costMap, saved] = await Promise.all([
-      fetchInvoicesForRepMonth(rep, start, end),
-      fetchInvoicesForRepMonth(rep, pStart, pEnd),
-      loadPaymentMap(start, end),
+    const [thisPayments, lastPayments, allInvoices, costMap, saved] = await Promise.all([
+      fetchPaymentsForMonth(start, end),
+      fetchPaymentsForMonth(pStart, pEnd),
+      loadAllInvoices(lookbackStr, end),
       loadItemCostMap(),
       loadCommissionConfig(rep, month),
     ]);
+    const invoicesById = new Map(allInvoices.map(i => [i.Id, i]));
 
-    const metrics = computeCommissionMetrics(rep, thisInvoices, paymentMap, costMap);
-    const lastMetrics = computeCommissionMetrics(rep, lastInvoices, new Map(), costMap);
+    const metrics = computeCashBasisMetrics(rep, thisPayments, invoicesById, costMap);
+    const lastMetrics = computeCashBasisMetrics(rep, lastPayments, invoicesById, costMap);
 
     _commissionState = {
       rep, month,
@@ -2395,7 +2435,7 @@ async function loadCommissionReport() {
       customDeductions: (saved.deductions || []).map(d => ({ ...d })),
       metrics, lastMetrics,
       autoDeductions: buildAutoDeductions(metrics, saved.ccRate ?? 3, saved.warrantyRate ?? 3),
-      invoices: thisInvoices, paymentMap, costMap,
+      invoicesById, costMap,
     };
 
     const monthLabel = new Date(month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
@@ -2436,9 +2476,9 @@ function renderCommissionSummary(m) {
   $('comm-gp').textContent = fmt(m.gp);
   $('comm-margin').textContent = pct(m.gpMargin);
   $('comm-inv-count').textContent = String(m.invoiceCount);
-  $('comm-inv-count-sub').textContent = `${fmt(m.revenue / Math.max(1, m.invoiceCount))} avg`;
-  $('comm-conversion').textContent = pct(m.conversion);
-  $('comm-conversion-sub').textContent = `${fmt(m.paid)} paid`;
+  $('comm-inv-count-sub').textContent = `${m.paymentCount} payment${m.paymentCount === 1 ? '' : 's'} · ${fmt(m.revenue / Math.max(1, m.invoiceCount))} avg`;
+  $('comm-conversion').textContent = m.avgDaysToPay != null ? `${m.avgDaysToPay}d` : '—';
+  $('comm-conversion-sub').textContent = 'avg time to pay';
   $('comm-cogs-coverage').textContent = pct(m.cogsCoverage);
   const uncovered = m.revenue - m.revenueWithCost;
   $('comm-cogs-coverage-sub').textContent = uncovered > 0 ? `${fmt(uncovered)} without cost data` : 'fully covered';
@@ -2681,22 +2721,25 @@ function openSavedReport(rep, month) {
 
 function renderCommissionInvoicesTable(metrics) {
   const tbody = $('comm-invoices-tbody');
-  if (!metrics.invoiceRows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices for this rep in this period.</td></tr>';
+  if (!metrics.paymentRows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text2)">No payments received for this rep in this period.</td></tr>';
     return;
   }
-  tbody.innerHTML = metrics.invoiceRows.map(r => {
+  tbody.innerHTML = metrics.paymentRows.map(r => {
     const url = qbInvoiceUrl(r.id);
     const onclick = url ? `onclick="openInvoiceInQb('${r.id}')"` : '';
     const cls = url ? 'clickable' : '';
-    return `<tr class="${cls}" ${onclick} title="Click to open in QuickBooks">
-      <td>${r.date || '—'}</td>
-      <td><strong>${attrEscape(r.docNum || '—')}</strong></td>
+    const partial = r.applied < r.invoiceTotal - 0.01;
+    return `<tr class="${cls}" ${onclick} title="Click to open invoice in QuickBooks">
+      <td><strong>${r.paymentDate || '—'}</strong></td>
+      <td>${attrEscape(r.docNum || '—')}</td>
+      <td>${r.invoiceDate || '—'}</td>
       <td>${attrEscape(r.customer || '—')}</td>
-      <td>${fmt(r.amount)}</td>
-      <td>${fmt(r.tax)}</td>
-      <td>${fmt(r.shipping)}</td>
-      <td><span class="badge ${r.status}">${(r.status || '').toUpperCase()}</span></td>
+      <td>${fmt(r.invoiceTotal)}</td>
+      <td><strong>${fmt(r.applied)}</strong>${partial ? ' <span class="badge open" style="font-size:.65rem;">PARTIAL</span>' : ''}</td>
+      <td>${fmt(r.taxApplied)}</td>
+      <td>${fmt(r.shippingApplied)}</td>
+      <td>${attrEscape(r.method || '—')}</td>
     </tr>`;
   }).join('');
 }
