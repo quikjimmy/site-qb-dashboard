@@ -219,11 +219,52 @@
   #comm-deductions-table .auto-row { background: rgba(40,239,206,.04); }
   #comm-deductions-table .auto-label { font-weight: 600; }
   #comm-deductions-table .basis-cell { color: var(--text2); font-size: .8rem; }
+  #comm-deductions-table .auto-hint { font-size: .68rem; color: var(--text2); margin-top: 2px; }
+  #comm-deductions-table .auto-hint button { background: transparent; border: none; color: var(--qb-blue); cursor: pointer; padding: 0; font: inherit; font-size: .7rem; text-decoration: underline; }
+  #comm-deductions-table .override-mark { display: inline-block; padding: 1px 6px; border-radius: 3px; background: rgba(106,89,229,.18); color: var(--purple); font-size: .65rem; font-weight: 700; letter-spacing: .3px; margin-left: 6px; }
   .delta-up { color: var(--qb-green); font-weight: 600; }
   .delta-down { color: var(--red); font-weight: 600; }
   .delta-flat { color: var(--text2); }
   .remove-row-btn { background: transparent; border: 1px solid var(--border); color: var(--red); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: .75rem; font-family: inherit; }
   .remove-row-btn:hover { border-color: var(--red); }
+
+  /* Status pill */
+  .status-pill { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: .7rem; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; vertical-align: middle; margin-left: 12px; }
+  .status-pill.draft { background: rgba(244,180,67,.18); color: var(--orange); border: 1px solid rgba(244,180,67,.35); }
+  .status-pill.final { background: rgba(116,231,154,.18); color: var(--qb-green); border: 1px solid rgba(116,231,154,.35); }
+
+  /* Saved reports drawer */
+  .saved-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+  .saved-item { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; cursor: pointer; transition: border-color .15s; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .saved-item:hover { border-color: var(--qb-blue); }
+  .saved-item .meta { font-size: .75rem; color: var(--text2); margin-top: 2px; }
+  .saved-item .label { font-weight: 600; }
+
+  /* COGS Quality table */
+  .cogs-row.missing { background: rgba(244,180,67,.06); }
+  .cogs-row.missing td:first-child { border-left: 3px solid var(--orange); padding-left: 9px; }
+
+  .print-only { display: none; }
+  /* Print stylesheet — rep-facing version */
+  @media print {
+    .print-only { display: block; }
+    @page { size: letter; margin: 0.5in; }
+    body { background: white !important; color: black !important; }
+    .topbar, .page-nav, .filters, #login-screen, #page-dashboard, #page-attention, .save-all-btn, .table-actions, .remove-row-btn, .auto-hint, button, #comm-saved-drawer { display: none !important; }
+    #page-commission, #page-commission * { color: #000 !important; }
+    .table-card, .kpi-card, .kpi-strip { background: white !important; border: 1px solid #ddd !important; box-shadow: none !important; break-inside: avoid; }
+    .kpi-card .value { color: #000 !important; }
+    .kpi-card.headline { background: #f6fbf8 !important; }
+    table { font-size: 11px !important; }
+    thead th { color: #444 !important; }
+    .status-pill.final { background: #e8f7ed !important; color: #1a6634 !important; border: 1px solid #1a6634 !important; }
+    .status-pill.draft { background: #fff5e0 !important; color: #7a5a00 !important; border: 1px solid #7a5a00 !important; }
+    #comm-deductions-table input { border: none !important; background: transparent !important; padding: 0 !important; color: #000 !important; }
+    #comm-deductions-table input::placeholder { color: transparent !important; }
+    #comm-rate { border: none !important; background: transparent !important; padding: 0 !important; }
+    .delta-up { color: #1a6634 !important; }
+    .delta-down { color: #b03a1a !important; }
+  }
 
   /* Rep history strip */
   .rep-history { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
@@ -548,16 +589,25 @@
     <!-- PAGE: Commission -->
     <div id="page-commission" class="hidden">
       <div class="table-card">
-        <h3>Commission Report</h3>
-        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month. Auto-pulled from QBO; deductions and rate persist to storage.</p>
+        <h3>Commission Report <span id="comm-status-pill" class="status-pill draft hidden">Draft</span></h3>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:16px;">Per rep, per month. Auto-pulled from QBO; deductions, rate, and status persist.</p>
         <div class="filters">
           <label>Rep<select id="comm-rep"><option value="">Select…</option></select></label>
           <label>Month<input type="month" id="comm-month"></label>
           <button class="apply-btn" type="button" onclick="loadCommissionReport()">Run Report</button>
+          <button class="apply-btn" type="button" onclick="toggleSavedDrawer()" style="background:transparent;color:var(--qb-blue);border:1px solid var(--qb-blue);">Saved Reports</button>
+        </div>
+        <div id="comm-saved-drawer" class="hidden" style="margin-top:14px;">
+          <div id="comm-saved-list" class="saved-list"><div class="loading-overlay"><div class="spinner"></div>Loading…</div></div>
         </div>
       </div>
 
       <div id="comm-report" class="hidden">
+        <!-- Print-only header -->
+        <div class="print-only" style="margin-bottom:16px;">
+          <div style="font-size:1.6rem;font-weight:700;" id="comm-print-title">Commission Report</div>
+          <div style="font-size:.95rem;color:#444;margin-top:4px;" id="comm-print-period">—</div>
+        </div>
         <!-- Period Summary -->
         <div class="kpi-grid">
           <div class="kpi-card revenue"><div class="label">Revenue</div><div class="value" id="comm-revenue">—</div><div class="sub" id="comm-revenue-sub"></div></div>
@@ -575,10 +625,10 @@
 
         <!-- Deductions -->
         <div class="table-card">
-          <h3>Deductions</h3>
+          <h3>Deductions <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· auto values are pre-filled from QBO; edit any amount to override</span></h3>
           <div class="table-wrap">
             <table id="comm-deductions-table">
-              <thead><tr><th>Deduction</th><th>Basis</th><th style="width:120px;">Rate %</th><th style="width:140px;">Amount</th><th style="width:60px;"></th></tr></thead>
+              <thead><tr><th style="width:160px;">Deduction</th><th>Basis</th><th style="width:90px;">Rate %</th><th style="width:160px;">Amount</th><th style="width:70px;"></th></tr></thead>
               <tbody id="comm-deductions-tbody"></tbody>
             </table>
           </div>
@@ -604,9 +654,11 @@
               <div style="font-size:2rem;font-weight:700;color:var(--qb-green);font-variant-numeric:tabular-nums;" id="comm-due">—</div>
             </div>
           </div>
-          <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;align-items:center;">
+          <div style="margin-top:16px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;align-items:center;">
             <span class="row-save-status" id="comm-save-status" aria-live="polite"></span>
-            <button class="save-all-btn" type="button" id="comm-save-btn" onclick="saveCommissionConfig()">Save Rate &amp; Deductions</button>
+            <button class="save-all-btn" type="button" id="comm-print-btn" style="background:transparent;color:var(--text);border:1px solid var(--border);" onclick="window.print()">Print / Export PDF</button>
+            <button class="save-all-btn" type="button" id="comm-finalize-btn" style="background:transparent;color:var(--qb-green);border:1px solid var(--qb-green);" onclick="toggleFinalize()">Mark as Final</button>
+            <button class="save-all-btn" type="button" id="comm-save-btn" onclick="saveCommissionConfig()">Save</button>
           </div>
         </div>
 
@@ -628,6 +680,44 @@
             </table>
           </div>
         </div>
+
+        <!-- Invoices in Period -->
+        <div class="table-card">
+          <h3>Invoices in Period <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· click to open in QBO</span></h3>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Date</th>
+                <th>Invoice #</th>
+                <th>Customer</th>
+                <th>Amount</th>
+                <th>Tax</th>
+                <th>Shipping</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody id="comm-invoices-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- COGS Quality -->
+        <details class="table-card" id="comm-cogs-quality">
+          <summary><h3>COGS Quality <span id="comm-cogs-quality-summary" style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;"></span></h3></summary>
+          <p style="font-size:.85rem;color:var(--text2);margin:8px 0 12px;">SKUs sold this period and whether each has an inventory cost (PurchaseCost) configured on the Item record in QBO.</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>SKU / Item</th>
+                <th>Qty</th>
+                <th>Revenue</th>
+                <th>Unit Cost</th>
+                <th>Implied COGS</th>
+                <th>Status</th>
+              </tr></thead>
+              <tbody id="comm-cogs-tbody"></tbody>
+            </table>
+          </div>
+        </details>
       </div>
 
       <div id="comm-empty" style="text-align:center;color:var(--text2);padding:40px 20px;">Pick a rep and month, then Run Report.</div>
@@ -2100,9 +2190,17 @@ let _commissionState = {
   rep: null,
   month: null,
   rate: null,
+  status: 'draft',
+  ccRate: 3,
+  warrantyRate: 3,
+  overrides: { tax: null, ccFee: null, warranty: null, shipping: null }, // null = use auto
   customDeductions: [],   // [{id, label, amount}]
-  metrics: null,          // { revenue, cogs, gp, ... }
-  autoDeductions: [],     // [{key, label, basis, rate, amount}]
+  metrics: null,
+  lastMetrics: null,
+  autoDeductions: [],
+  invoices: [],           // raw QBO invoice rows for the period (after rep filter)
+  paymentMap: new Map(),
+  costMap: new Map(),
 };
 
 async function initCommissionPage() {
@@ -2143,13 +2241,27 @@ function isCcMethod(name) {
   return /(visa|mastercard|master card|amex|american express|discover|credit|card)/.test(s);
 }
 
+function taxFromInvoice(inv) {
+  // Primary path: TxnTaxDetail.TotalTax
+  const total = Number(inv.TxnTaxDetail?.TotalTax) || 0;
+  if (total) return total;
+  // Fallback: sum tax lines if present
+  const lines = inv.TxnTaxDetail?.TaxLine || [];
+  let sum = 0;
+  for (const l of lines) {
+    sum += Number(l.Amount) || Number(l.TaxLineDetail?.NetAmountTaxable) || 0;
+  }
+  return sum;
+}
+
 function shippingFromInvoice(inv) {
   let total = 0;
+  // Match common shipping/freight item names
+  const re = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
   for (const line of (inv.Line || [])) {
-    if (line.DetailType === 'SalesItemLineDetail') {
-      const name = line.SalesItemLineDetail?.ItemRef?.name || '';
-      if (/ship/i.test(name)) total += Number(line.Amount) || 0;
-    }
+    if (line.DetailType !== 'SalesItemLineDetail') continue;
+    const name = line.SalesItemLineDetail?.ItemRef?.name || '';
+    if (re.test(name)) total += Number(line.Amount) || 0;
   }
   return total;
 }
@@ -2166,34 +2278,34 @@ function computeCommissionMetrics(rep, invoices, paymentMap, costMap) {
     overdue: 0,
     ccPaid: 0,
     shipping: 0,
-    customers: new Map(),  // name → { count, total }
+    customers: new Map(),
+    skus: new Map(),       // name → { qty, revenue, hasCost, unitCost }
+    invoiceRows: [],       // [{id, date, docNum, customer, amount, balance, tax, shipping, status, paymentMethod}]
   };
   const today = new Date();
   for (const inv of invoices) {
     const total = Number(inv.TotalAmt) || 0;
     const balance = Number(inv.Balance) || 0;
-    const tax = Number(inv.TxnTaxDetail?.TotalTax) || 0;
+    const tax = taxFromInvoice(inv);
+    const ship = shippingFromInvoice(inv);
     const status = balance <= 0 && total > 0 ? 'paid' : (inv.DueDate && new Date(inv.DueDate) < today && balance > 0 ? 'overdue' : 'open');
+    const method = paymentMap.get(inv.Id);
 
     result.revenue += total;
     result.tax += tax;
+    result.shipping += ship;
     if (status === 'paid') result.paid += total;
     else if (status === 'overdue') result.overdue += balance;
     else result.open += balance;
-
-    // CC fee basis = paid invoices charged to CC. Use total paid amount on the invoice.
-    const method = paymentMap.get(inv.Id);
     if (status === 'paid' && isCcMethod(method)) result.ccPaid += total;
 
-    // Shipping line items
-    result.shipping += shippingFromInvoice(inv);
-
-    // COGS + cost coverage
+    // Per-line accounting (COGS + SKU diagnostic)
+    const shippingRe = /(^|[^a-z])(ship(?:ping)?|freight|s\/h|delivery|handling)([^a-z]|$)/i;
     for (const line of (inv.Line || [])) {
       if (line.DetailType !== 'SalesItemLineDetail') continue;
       const name = line.SalesItemLineDetail?.ItemRef?.name;
       if (!name) continue;
-      if (/ship/i.test(name)) continue; // exclude shipping from COGS coverage measure
+      if (shippingRe.test(name)) continue;
       const amount = Number(line.Amount) || 0;
       const qty = Number(line.SalesItemLineDetail?.Qty) || 0;
       const unitCost = costMap?.get(name) || 0;
@@ -2201,6 +2313,11 @@ function computeCommissionMetrics(rep, invoices, paymentMap, costMap) {
         result.cogs += unitCost * qty;
         result.revenueWithCost += amount;
       }
+      const sku = result.skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0 };
+      sku.qty += qty;
+      sku.revenue += amount;
+      if (unitCost > 0) { sku.hasCost = true; sku.unitCost = unitCost; }
+      result.skus.set(name, sku);
     }
 
     const cust = inv.CustomerRef?.name || 'Unknown';
@@ -2208,46 +2325,56 @@ function computeCommissionMetrics(rep, invoices, paymentMap, costMap) {
     c.count++;
     c.total += total;
     result.customers.set(cust, c);
+
+    result.invoiceRows.push({
+      id: inv.Id,
+      date: inv.TxnDate,
+      docNum: inv.DocNumber,
+      customer: cust,
+      amount: total,
+      balance,
+      tax,
+      shipping: ship,
+      status,
+      paymentMethod: method || null,
+    });
   }
   result.gp = result.revenue - result.cogs;
   result.gpMargin = result.revenue > 0 ? (result.gp / result.revenue) * 100 : 0;
   result.conversion = result.revenue > 0 ? (result.paid / result.revenue) * 100 : 0;
   result.cogsCoverage = result.revenue > 0 ? (result.revenueWithCost / result.revenue) * 100 : 0;
+  result.invoiceRows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   return result;
 }
 
-function buildAutoDeductions(metrics) {
+function buildAutoDeductions(metrics, ccRate, warrantyRate) {
   return [
-    { key: 'tax', label: 'Tax', basis: 'Invoice tax (TxnTaxDetail.TotalTax)', rate: null, amount: metrics.tax },
-    { key: 'cc', label: 'Credit card fee', basis: 'Paid via CC × rate', rate: 3, amount: metrics.ccPaid * 0.03, ccPaid: metrics.ccPaid },
-    { key: 'warranty', label: 'Warranty holdback', basis: 'Revenue × rate', rate: 3, amount: metrics.revenue * 0.03 },
-    { key: 'shipping', label: 'Shipping', basis: 'Sum of "Shipping" line items', rate: null, amount: metrics.shipping },
+    { key: 'tax',      label: 'Tax',                basis: 'TxnTaxDetail.TotalTax (per invoice)', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.tax },
+    { key: 'ccFee',    label: 'Credit card fee',    basis: `Paid via CC (${fmt(metrics.ccPaid)}) × rate`, editableRate: true, rate: ccRate, ccPaid: metrics.ccPaid, autoAmount: metrics.ccPaid * (ccRate / 100) },
+    { key: 'warranty', label: 'Warranty holdback',  basis: `Revenue × rate`, editableRate: true, rate: warrantyRate, ccPaid: 0, autoAmount: metrics.revenue * (warrantyRate / 100) },
+    { key: 'shipping', label: 'Shipping',           basis: 'Sum of shipping/freight line items', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.shipping },
   ];
 }
 
 async function loadCommissionReport() {
   const rep = $('comm-rep').value;
   const month = $('comm-month').value;
-  if (!rep || !month) {
-    alert('Pick a rep and a month first.');
-    return;
-  }
-  if (isDemoMode) {
-    alert('Commission report is not available in demo mode — connect to QuickBooks to use it.');
-    return;
-  }
+  if (!rep || !month) { alert('Pick a rep and a month first.'); return; }
+  if (isDemoMode) { alert('Commission report is not available in demo mode — connect to QuickBooks to use it.'); return; }
+
   $('comm-empty').classList.add('hidden');
   $('comm-report').classList.remove('hidden');
-  // Loading placeholders
   ['comm-revenue','comm-cogs','comm-gp','comm-margin','comm-inv-count','comm-conversion','comm-cogs-coverage','comm-customer-count','comm-base','comm-due'].forEach(id => { const el = $(id); if (el) el.textContent = '…'; });
   $('comm-deductions-tbody').innerHTML = '<tr><td colspan="5" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
   $('comm-customer-tbody').innerHTML = '<tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
+  $('comm-invoices-tbody').innerHTML = '<tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
+  $('comm-cogs-tbody').innerHTML = '<tr><td colspan="6" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr>';
 
   const [start, end] = monthBounds(month);
   const [pStart, pEnd] = priorMonthBounds(month);
 
   try {
-    const [thisInvoices, lastInvoices, paymentMap, costMap, savedConfig] = await Promise.all([
+    const [thisInvoices, lastInvoices, paymentMap, costMap, saved] = await Promise.all([
       fetchInvoicesForRepMonth(rep, start, end),
       fetchInvoicesForRepMonth(rep, pStart, pEnd),
       loadPaymentMap(start, end),
@@ -2260,17 +2387,29 @@ async function loadCommissionReport() {
 
     _commissionState = {
       rep, month,
-      rate: savedConfig.rate,
-      customDeductions: (savedConfig.deductions || []).map(d => ({ ...d })),
-      metrics,
-      lastMetrics,
-      autoDeductions: buildAutoDeductions(metrics),
+      rate: saved.rate,
+      status: saved.status || 'draft',
+      ccRate: saved.ccRate ?? 3,
+      warrantyRate: saved.warrantyRate ?? 3,
+      overrides: { tax: saved.overrides?.tax ?? null, ccFee: saved.overrides?.ccFee ?? null, warranty: saved.overrides?.warranty ?? null, shipping: saved.overrides?.shipping ?? null },
+      customDeductions: (saved.deductions || []).map(d => ({ ...d })),
+      metrics, lastMetrics,
+      autoDeductions: buildAutoDeductions(metrics, saved.ccRate ?? 3, saved.warrantyRate ?? 3),
+      invoices: thisInvoices, paymentMap, costMap,
     };
+
+    const monthLabel = new Date(month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    $('comm-print-title').textContent = `Commission Report — ${rep}`;
+    $('comm-print-period').textContent = `${monthLabel} · generated ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}`;
 
     renderCommissionSummary(metrics);
     renderDeductionsTable();
     renderCommissionCustomerTable(metrics, lastMetrics);
-    if (savedConfig.rate != null) $('comm-rate').value = savedConfig.rate;
+    renderCommissionInvoicesTable(metrics);
+    renderCogsQuality(metrics);
+    renderStatusPill();
+    if (saved.rate != null) $('comm-rate').value = saved.rate;
+    else $('comm-rate').value = '';
     recomputeCommission();
   } catch (e) {
     console.error(e);
@@ -2281,9 +2420,14 @@ async function loadCommissionReport() {
 async function loadCommissionConfig(rep, month) {
   try {
     const res = await fetch(`/api/commission?rep=${encodeURIComponent(rep)}&month=${encodeURIComponent(month)}`, { credentials: 'include' });
-    if (!res.ok) return { rate: null, deductions: [] };
+    if (!res.ok) return {};
     return await res.json();
-  } catch { return { rate: null, deductions: [] }; }
+  } catch { return {}; }
+}
+
+function effectiveAmount(d) {
+  const o = _commissionState.overrides[d.key];
+  return o != null ? o : d.autoAmount;
 }
 
 function renderCommissionSummary(m) {
@@ -2307,15 +2451,22 @@ function renderDeductionsTable() {
   const custom = _commissionState.customDeductions || [];
   const dash = '<span style="color:var(--text2);">—</span>';
   const autoRows = auto.map(d => {
-    const rateCell = d.rate != null
+    const o = _commissionState.overrides[d.key];
+    const isOverridden = o != null;
+    const effective = isOverridden ? o : d.autoAmount;
+    const rateCell = d.editableRate
       ? `<input type="number" step="0.1" min="0" max="100" value="${d.rate}" data-auto-key="${d.key}" oninput="onAutoRateChange(this)" aria-label="${attrEscape(d.label)} rate">`
       : dash;
+    const overrideMark = isOverridden ? '<span class="override-mark">manual</span>' : '';
+    const resetBtn = isOverridden
+      ? `<button type="button" class="remove-row-btn" onclick="resetAutoOverride('${d.key}')" title="Reset to QBO value">Reset</button>`
+      : `<span style="color:var(--text2);font-size:.7rem;">auto</span>`;
     return `<tr class="auto-row" data-auto-key="${d.key}">
-      <td class="auto-label">${attrEscape(d.label)}</td>
-      <td class="basis-cell">${attrEscape(d.basis)}</td>
+      <td class="auto-label">${attrEscape(d.label)}${overrideMark}</td>
+      <td class="basis-cell">${attrEscape(d.basis)}<div class="auto-hint">QBO: ${fmt(d.autoAmount)}</div></td>
       <td>${rateCell}</td>
-      <td class="auto-amount">${fmt(d.amount)}</td>
-      <td>${dash}</td>
+      <td><input type="number" step="0.01" value="${Number(effective).toFixed(2)}" data-auto-amount-key="${d.key}" oninput="onAutoAmountChange(this)" aria-label="${attrEscape(d.label)} amount"></td>
+      <td>${resetBtn}</td>
     </tr>`;
   }).join('');
   const customRows = custom.map(d => `
@@ -2323,7 +2474,7 @@ function renderDeductionsTable() {
       <td><input type="text" value="${attrEscape(d.label)}" placeholder="Label (e.g. Gas card)" oninput="onCustomFieldChange(this, 'label')" aria-label="Custom deduction label"></td>
       <td class="basis-cell">Manual</td>
       <td>${dash}</td>
-      <td><input type="number" step="0.01" value="${d.amount}" oninput="onCustomFieldChange(this, 'amount')" aria-label="Custom deduction amount"></td>
+      <td><input type="number" step="0.01" value="${Number(d.amount).toFixed(2)}" oninput="onCustomFieldChange(this, 'amount')" aria-label="Custom deduction amount"></td>
       <td><button type="button" class="remove-row-btn" onclick="removeCustomDeduction('${attrEscape(d.id)}')">Remove</button></td>
     </tr>`).join('');
   const totals = totalDeductions();
@@ -2336,7 +2487,7 @@ function renderDeductionsTable() {
 }
 
 function totalDeductions() {
-  const auto = (_commissionState.autoDeductions || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  const auto = (_commissionState.autoDeductions || []).reduce((s, d) => s + (Number(effectiveAmount(d)) || 0), 0);
   const custom = (_commissionState.customDeductions || []).reduce((s, d) => s + (Number(d.amount) || 0), 0);
   return auto + custom;
 }
@@ -2347,13 +2498,29 @@ function onAutoRateChange(input) {
   const d = _commissionState.autoDeductions.find(x => x.key === key);
   if (!d) return;
   d.rate = rate;
-  if (key === 'cc') d.amount = (d.ccPaid || 0) * (rate / 100);
-  else if (key === 'warranty') d.amount = (_commissionState.metrics.revenue || 0) * (rate / 100);
-  // Update the displayed amount cell
-  const row = input.closest('tr');
-  const amtCell = row?.querySelector('.auto-amount');
-  if (amtCell) amtCell.textContent = fmt(d.amount);
-  // Recompute totals + commission
+  if (key === 'ccFee') d.autoAmount = (d.ccPaid || 0) * (rate / 100);
+  else if (key === 'warranty') d.autoAmount = (_commissionState.metrics.revenue || 0) * (rate / 100);
+  if (key === 'ccFee') _commissionState.ccRate = rate;
+  if (key === 'warranty') _commissionState.warrantyRate = rate;
+  // Changing the rate clears any manual override (rate is now driving)
+  _commissionState.overrides[key] = null;
+  renderDeductionsTable();
+  recomputeCommission();
+}
+
+function onAutoAmountChange(input) {
+  const key = input.dataset.autoAmountKey;
+  const val = input.value === '' ? null : Number(input.value);
+  _commissionState.overrides[key] = (val == null || Number.isNaN(val)) ? null : val;
+  // Live update totals without full re-render to keep input focus
+  const tbody = $('comm-deductions-tbody');
+  const totalCell = tbody?.querySelector('tr:last-child td:nth-child(2)');
+  if (totalCell) totalCell.textContent = fmt(totalDeductions());
+  recomputeCommission();
+}
+
+function resetAutoOverride(key) {
+  _commissionState.overrides[key] = null;
   renderDeductionsTable();
   recomputeCommission();
 }
@@ -2365,12 +2532,9 @@ function onCustomFieldChange(input, field) {
   if (field === 'amount') d.amount = Number(input.value) || 0;
   else d[field] = input.value;
   if (field === 'amount') {
-    // refresh totals only
     const tbody = $('comm-deductions-tbody');
-    if (tbody) {
-      const totalCell = tbody.querySelector('tr:last-child td:nth-child(2)');
-      if (totalCell) totalCell.textContent = fmt(totalDeductions());
-    }
+    const totalCell = tbody?.querySelector('tr:last-child td:nth-child(2)');
+    if (totalCell) totalCell.textContent = fmt(totalDeductions());
     recomputeCommission();
   }
 }
@@ -2398,10 +2562,10 @@ function recomputeCommission() {
   $('comm-due').textContent = fmt(due);
 }
 
-async function saveCommissionConfig() {
+async function saveCommissionConfig(opts = {}) {
   const btn = $('comm-save-btn');
   const status = $('comm-save-status');
-  if (!_commissionState.rep || !_commissionState.month) { alert('Run a report first.'); return; }
+  if (!_commissionState.rep || !_commissionState.month) { alert('Run a report first.'); return false; }
   btn.disabled = true;
   status.textContent = 'Saving…';
   status.className = 'row-save-status saving';
@@ -2409,23 +2573,164 @@ async function saveCommissionConfig() {
   const cleanCustom = _commissionState.customDeductions
     .filter(d => d.label.trim())
     .map(d => ({ id: d.id, label: d.label.trim().slice(0, 80), amount: Number(d.amount) || 0 }));
+  const body = {
+    rep: _commissionState.rep,
+    month: _commissionState.month,
+    rate: Number.isFinite(rate) ? rate : null,
+    ccRate: _commissionState.ccRate,
+    warrantyRate: _commissionState.warrantyRate,
+    status: opts.status || _commissionState.status || 'draft',
+    overrides: _commissionState.overrides,
+    deductions: cleanCustom,
+  };
   try {
     const res = await fetch('/api/commission', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rep: _commissionState.rep, month: _commissionState.month, rate: Number.isFinite(rate) ? rate : null, deductions: cleanCustom }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(await res.text() || 'Save failed');
+    const saved = await res.json();
+    _commissionState.status = saved.status || _commissionState.status;
+    renderStatusPill();
     status.textContent = 'Saved';
     status.className = 'row-save-status saved';
     setTimeout(() => { status.textContent = ''; status.className = 'row-save-status'; }, 2000);
+    btn.disabled = false;
+    return true;
   } catch (e) {
     status.textContent = 'Failed';
     status.className = 'row-save-status failed';
     status.title = e.message || 'Save failed';
+    btn.disabled = false;
+    return false;
   }
-  btn.disabled = false;
+}
+
+async function toggleFinalize() {
+  const isFinal = _commissionState.status === 'final';
+  const next = isFinal ? 'draft' : 'final';
+  if (next === 'final' && !confirm('Mark this report as Final? You can reopen it later.')) return;
+  const ok = await saveCommissionConfig({ status: next });
+  if (ok) {
+    _commissionState.status = next;
+    renderStatusPill();
+  }
+}
+
+function renderStatusPill() {
+  const pill = $('comm-status-pill');
+  const finalizeBtn = $('comm-finalize-btn');
+  if (!pill) return;
+  const status = _commissionState.status || 'draft';
+  pill.classList.remove('hidden', 'draft', 'final');
+  pill.classList.add(status);
+  pill.textContent = status === 'final' ? 'Final' : 'Draft';
+  if (finalizeBtn) {
+    finalizeBtn.textContent = status === 'final' ? 'Reopen as Draft' : 'Mark as Final';
+    finalizeBtn.style.color = status === 'final' ? 'var(--orange)' : 'var(--qb-green)';
+    finalizeBtn.style.borderColor = status === 'final' ? 'var(--orange)' : 'var(--qb-green)';
+  }
+}
+
+async function toggleSavedDrawer() {
+  const drawer = $('comm-saved-drawer');
+  if (drawer.classList.contains('hidden')) {
+    drawer.classList.remove('hidden');
+    await loadSavedReportsList();
+  } else {
+    drawer.classList.add('hidden');
+  }
+}
+
+async function loadSavedReportsList() {
+  const list = $('comm-saved-list');
+  list.innerHTML = '<div class="loading-overlay"><div class="spinner"></div>Loading…</div>';
+  try {
+    const res = await fetch('/api/commission?list=1', { credentials: 'include' });
+    if (!res.ok) throw new Error('Failed');
+    const { items } = await res.json();
+    if (!items.length) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text2);padding:20px;">No saved reports yet.</div>';
+      return;
+    }
+    items.sort((a, b) => (b.month || '').localeCompare(a.month || '') || (a.rep || '').localeCompare(b.rep || ''));
+    list.innerHTML = items.map(item => {
+      const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+      const monthLabel = item.month ? new Date(item.month + '-01').toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '—';
+      return `<div class="saved-item" onclick="openSavedReport('${attrEscape(item.rep)}','${attrEscape(item.month)}')">
+        <div>
+          <div class="label">${attrEscape(item.rep)}</div>
+          <div class="meta">${attrEscape(monthLabel)} · saved ${updated}</div>
+        </div>
+        <span class="status-pill ${item.status === 'final' ? 'final' : 'draft'}">${item.status === 'final' ? 'Final' : 'Draft'}</span>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    list.innerHTML = '<div style="color:var(--red);padding:12px;">Failed to load: ' + attrEscape(e.message || '') + '</div>';
+  }
+}
+
+function openSavedReport(rep, month) {
+  $('comm-rep').value = rep;
+  $('comm-month').value = month;
+  $('comm-saved-drawer').classList.add('hidden');
+  loadCommissionReport();
+}
+
+function renderCommissionInvoicesTable(metrics) {
+  const tbody = $('comm-invoices-tbody');
+  if (!metrics.invoiceRows.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text2)">No invoices for this rep in this period.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = metrics.invoiceRows.map(r => {
+    const url = qbInvoiceUrl(r.id);
+    const onclick = url ? `onclick="openInvoiceInQb('${r.id}')"` : '';
+    const cls = url ? 'clickable' : '';
+    return `<tr class="${cls}" ${onclick} title="Click to open in QuickBooks">
+      <td>${r.date || '—'}</td>
+      <td><strong>${attrEscape(r.docNum || '—')}</strong></td>
+      <td>${attrEscape(r.customer || '—')}</td>
+      <td>${fmt(r.amount)}</td>
+      <td>${fmt(r.tax)}</td>
+      <td>${fmt(r.shipping)}</td>
+      <td><span class="badge ${r.status}">${(r.status || '').toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCogsQuality(metrics) {
+  const tbody = $('comm-cogs-tbody');
+  const summary = $('comm-cogs-quality-summary');
+  const skus = [...metrics.skus.entries()].sort((a, b) => b[1].revenue - a[1].revenue);
+  if (!skus.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text2)">No SKUs sold this period.</td></tr>';
+    if (summary) summary.textContent = '';
+    return;
+  }
+  const missing = skus.filter(([, s]) => !s.hasCost);
+  if (summary) {
+    summary.textContent = missing.length
+      ? `· ${missing.length} of ${skus.length} SKU${skus.length === 1 ? '' : 's'} missing cost data`
+      : `· all ${skus.length} SKUs have cost data ✓`;
+    summary.style.color = missing.length ? 'var(--orange)' : 'var(--qb-green)';
+  }
+  tbody.innerHTML = skus.map(([name, s]) => {
+    const implied = s.hasCost ? s.unitCost * s.qty : null;
+    const dash = '<span style="color:var(--text2);">—</span>';
+    return `<tr class="cogs-row ${s.hasCost ? '' : 'missing'}">
+      <td><strong>${attrEscape(name)}</strong></td>
+      <td>${s.qty || dash}</td>
+      <td>${fmt(s.revenue)}</td>
+      <td>${s.hasCost ? fmt(s.unitCost) : dash}</td>
+      <td>${implied != null ? fmt(implied) : dash}</td>
+      <td>${s.hasCost
+        ? '<span class="badge paid">HAS COST</span>'
+        : '<span class="badge overdue">NO COST</span>'}</td>
+    </tr>`;
+  }).join('');
 }
 
 function renderCommissionCustomerTable(thisMonth, lastMonth) {
