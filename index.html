@@ -127,6 +127,8 @@
   .badge.paid { background: rgba(116,231,154,.12); color: var(--qb-green); }
   .badge.open { background: rgba(244,180,67,.12); color: var(--orange); }
   .badge.overdue { background: rgba(251,124,79,.12); color: var(--red); }
+  .badge.counted { background: rgba(116,231,154,.18); color: var(--qb-green); }
+  .badge.partial { background: rgba(244,180,67,.18); color: var(--orange); }
 
   /* Loading */
   .spinner { display: inline-block; width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--qb-blue); border-radius: 50%; animation: spin .7s linear infinite; }
@@ -542,7 +544,7 @@
 
       <!-- Invoices Table (collapsible, client-side filters) -->
       <details class="table-card" id="invoices-details">
-        <summary><h3>Invoices in Range <span id="invoices-count" style="color:var(--text2);font-weight:500;"></span></h3></summary>
+        <summary><h3>Invoices Paid in Range <span id="invoices-count" style="color:var(--text2);font-weight:500;"></span> <span style="font-size:.7rem;color:var(--text2);font-weight:400;letter-spacing:0;text-transform:none;">· based on payment received date · cash-basis</span></h3></summary>
         <div class="invoice-filter-bar">
           <label>Status
             <select id="invoice-filter-status">
@@ -562,7 +564,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Amount</th><th>Balance</th><th>Status</th></tr></thead>
+            <thead><tr><th>Paid Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Amount</th><th>Paid $</th><th>Commission</th></tr></thead>
             <tbody id="invoices-tbody"><tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
@@ -955,6 +957,14 @@ function loadDemoData() {
     dueDate: null,
   }));
   _lastRows = rows;
+  // Demo cash-basis rows: any paid invoice gets a synthesized paid-date = invoice date.
+  _paidInRangeRows = rows.filter(r => r.paid).map(r => ({
+    ...r,
+    paidDate: r.date,
+    paidAmount: r.amount,
+    paidMethod: r.paymentMethod || 'Visa',
+    commissionStatus: 'counted',
+  }));
   buildCustomerHistoryIdx(rows);
   const demoClassPL = new Map(d.salesByRep.map(r => [r.rep, { income: r.sales, cogs: r.sales * 0.48 }]));
   populateInvoiceRepFilter(rows);
@@ -1033,15 +1043,20 @@ function renderInvoicesTable(invoices) {
       : (inv.docNum || '—');
     const onclick = inv.id ? `onclick="openInvoiceInQb('${inv.id}')"` : '';
     const title = inv.id ? 'title="Click to open in QuickBooks"' : '';
+    const commLabel = inv.commissionStatus === 'counted' ? 'COUNTED' : 'PARTIAL';
+    const paidDateCell = inv.paidDate || '—';
+    const partialNote = inv.commissionStatus === 'partial' && inv.amount > inv.paidAmount
+      ? ` <span style="font-size:.65rem;color:var(--text2);">of ${fmt(inv.amount)}</span>`
+      : '';
     return `
     <tr class="${classes.join(' ')}" ${onclick} ${title}>
-      <td>${inv.date || '—'}</td>
+      <td><strong>${paidDateCell}</strong></td>
       <td>${docCell}</td>
       <td>${inv.customer || '—'}</td>
       <td>${repCell}</td>
       <td>${fmt(inv.amount)}</td>
-      <td>${fmt(inv.balance)}</td>
-      <td><span class="badge ${inv.status}">${(inv.status || '').toUpperCase()}</span></td>
+      <td><strong>${fmt(inv.paidAmount)}</strong>${partialNote}</td>
+      <td><span class="badge ${inv.commissionStatus}" title="${inv.commissionStatus === 'counted' ? 'Fully paid — counted for commission' : 'Only partial payment received in this range'}">${commLabel}</span></td>
     </tr>`;
   }).join('');
   updateSaveAllButton();
@@ -1052,7 +1067,7 @@ function onRepChange(sel) {
   if (!editor) return;
   const invoiceId = editor.dataset.invoiceId;
   const className = sel.value;
-  const row = _lastRows.find(r => r.id === invoiceId);
+  const row = _paidInRangeRows.find(r => r.id === invoiceId) || _lastRows.find(r => r.id === invoiceId);
   const cls = _classMap.get(className);
   if (className && cls && className !== (row?.rep || '')) {
     _dirtyRows.set(invoiceId, { classId: cls.id, className });
@@ -1094,7 +1109,7 @@ async function postInvoiceClassUpdate(row, classId, className) {
 async function saveRow(invoiceId, btn) {
   const change = _dirtyRows.get(invoiceId);
   if (!change) return;
-  const row = _lastRows.find(r => r.id === invoiceId);
+  const row = _paidInRangeRows.find(r => r.id === invoiceId) || _lastRows.find(r => r.id === invoiceId);
   if (!row) return;
   const editor = btn.closest('.rep-editor');
   const status = editor?.querySelector('.row-save-status');
@@ -1153,8 +1168,11 @@ function updateSaveAllButton() {
 function updateAutoFillButton() {
   const btn = $('auto-fill-reps');
   if (!btn) return;
+  const seen = new Set();
   let count = 0;
-  for (const r of _lastRows) {
+  for (const r of [..._paidInRangeRows, ..._lastRows]) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
     if (r.rep) continue;
     if (_dirtyRows.has(r.id)) continue;
     if (suggestRepForInvoice(r)) count++;
@@ -1168,8 +1186,11 @@ function updateAutoFillButton() {
 }
 
 function autoFillSuggestedReps() {
+  const seen = new Set();
   let filled = 0;
-  for (const r of _lastRows) {
+  for (const r of [..._paidInRangeRows, ..._lastRows]) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
     if (r.rep) continue;
     if (_dirtyRows.has(r.id)) continue;
     const suggested = suggestRepForInvoice(r);
@@ -1200,11 +1221,11 @@ async function saveAllReps(btn) {
 function applyInvoiceFilters() {
   const statusFilter = $('invoice-filter-status').value;
   const repFilter = $('invoice-filter-rep').value;
-  const filtered = _lastRows.filter(r =>
+  const filtered = _paidInRangeRows.filter(r =>
     (!statusFilter || r.status === statusFilter) &&
     (!repFilter || r.rep === repFilter)
   );
-  const sorted = [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const sorted = [...filtered].sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || ''));
   renderInvoicesTable(sorted);
 }
 
@@ -1550,6 +1571,79 @@ async function loadPaymentMap(startDate, endDate) {
     }
   } catch {}
   return map;
+}
+
+// Richer payment map keyed by invoice ID — accumulates amount applied IN RANGE,
+// keeps the latest payment date in range, and the method used.
+async function loadInvoicePaidInRangeMap(startDate, endDate) {
+  const map = new Map();
+  try {
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    for (const p of data?.Payment || []) {
+      const method = p.PaymentMethodRef?.name || 'Unknown';
+      const date = p.TxnDate;
+      for (const line of p.Line || []) {
+        const amt = Number(line.Amount) || 0;
+        if (amt === 0) continue;
+        for (const linked of line.LinkedTxn || []) {
+          if (linked.TxnType !== 'Invoice' || !linked.TxnId) continue;
+          let entry = map.get(linked.TxnId);
+          if (!entry) {
+            entry = { paidDate: date, paidAmount: 0, method };
+            map.set(linked.TxnId, entry);
+          }
+          entry.paidAmount += amt;
+          if (date && (!entry.paidDate || date > entry.paidDate)) {
+            entry.paidDate = date;
+            entry.method = method;
+          }
+        }
+      }
+    }
+  } catch {}
+  return map;
+}
+
+// Build rows for the "Invoices in Range" cash-basis table.
+// Includes only invoices that received any payment within [startDate, endDate].
+// rawInvoices should be a wide window so we can resolve older invoices that
+// were finally paid this period.
+function buildPaidInRangeRows(rawInvoices, paidMap, paymentMethodMap, repFilter, productFilter) {
+  const today = new Date();
+  return rawInvoices
+    .filter(inv => paidMap.has(inv.Id))
+    .filter(inv => !repFilter || inv.ClassRef?.name === repFilter)
+    .filter(inv => !productFilter || (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter))
+    .map(inv => {
+      const balance = Number(inv.Balance) || 0;
+      const total = Number(inv.TotalAmt) || 0;
+      const due = inv.DueDate ? new Date(inv.DueDate) : null;
+      const fullyPaid = balance <= 0 && total > 0;
+      const overdue = balance > 0 && due && due < today;
+      const paidInfo = paidMap.get(inv.Id) || { paidDate: null, paidAmount: 0, method: null };
+      const productLines = (inv.Line || []).filter(l => l.DetailType === 'SalesItemLineDetail');
+      const productLinesWithItem = productLines.filter(l => l.SalesItemLineDetail?.ItemRef?.value);
+      const missingItemData = total > 0 && productLinesWithItem.length === 0;
+      return {
+        id: inv.Id,
+        syncToken: inv.SyncToken,
+        date: inv.TxnDate,                 // invoice creation date
+        paidDate: paidInfo.paidDate,
+        paidAmount: paidInfo.paidAmount,
+        paidMethod: paidInfo.method,
+        docNum: inv.DocNumber,
+        customer: inv.CustomerRef?.name || null,
+        rep: inv.ClassRef?.name || null,
+        amount: total,
+        balance,
+        status: fullyPaid ? 'paid' : (overdue ? 'overdue' : 'open'),
+        paid: fullyPaid,
+        commissionStatus: fullyPaid ? 'counted' : 'partial',
+        paymentMethod: paymentMethodMap.get(inv.Id) || paidInfo.method || null,
+        dueDate: inv.DueDate || null,
+        missingItemData,
+      };
+    });
 }
 
 function buildRows(rawInvoices, paymentMap, repFilter, productFilter) {
@@ -2086,7 +2180,8 @@ function setQuickRange(kind) {
 }
 
 // Cached rows for pivot dim changes without re-fetching
-let _lastRows = [];
+let _lastRows = [];                // invoices created in current filter range
+let _paidInRangeRows = [];         // invoices that received a payment in current filter range (cash-basis)
 let _attentionFlag = null;
 
 async function loadClassPL(startDate, endDate) {
@@ -2129,8 +2224,13 @@ async function refreshDashboard() {
   const repFilter = $('filter-rep').value || null;
   const productFilter = $('filter-product').value || null;
 
+  // Wide window so we can resolve older invoices that received payments this period
+  const wideStart = (() => { const d = new Date(startDate); d.setMonth(d.getMonth() - 18); return ymd(d); })();
+
   const invoicesFetch = loadAllInvoices(startDate, endDate);
+  const wideInvoicesFetch = loadAllInvoices(wideStart, endDate);
   const paymentsFetch = loadPaymentMap(startDate, endDate);
+  const paidMapFetch = loadInvoicePaidInRangeMap(startDate, endDate);
   const classPLFetch = loadClassPL(startDate, endDate);
   const activityFetch = loadInvoiceActivity();
   const repFilterFetch = loadRepFilter();
@@ -2142,12 +2242,23 @@ async function refreshDashboard() {
     (async () => {
       // Wait for class list before rendering invoice rows so the rep dropdown is populated.
       await repFilterFetch;
-      const [rawInvoices, paymentMap, classPL, activity] = await Promise.all([invoicesFetch, paymentsFetch, classPLFetch, activityFetch]);
+      const [rawInvoices, wideInvoices, paymentMap, paidMap, classPL, activity] = await Promise.all([
+        invoicesFetch, wideInvoicesFetch, paymentsFetch, paidMapFetch, classPLFetch, activityFetch
+      ]);
       const filteredRaw = productFilter ? rawInvoices.filter(inv => (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter)) : rawInvoices;
       const rows = buildRows(rawInvoices, paymentMap, repFilter, productFilter);
       _lastRows = rows;
-      buildCustomerHistoryIdx(rows);
-      populateInvoiceRepFilter(rows);
+      _paidInRangeRows = buildPaidInRangeRows(wideInvoices, paidMap, paymentMap, repFilter, productFilter);
+      // Build customer history from the broader dataset so rep history pips have richer context.
+      const histRows = wideInvoices.map(inv => ({
+        id: inv.Id,
+        customer: inv.CustomerRef?.name || null,
+        rep: inv.ClassRef?.name || null,
+        date: inv.TxnDate,
+        docNum: inv.DocNumber,
+      }));
+      buildCustomerHistoryIdx(histRows);
+      populateInvoiceRepFilter([...rows, ..._paidInRangeRows]);
       renderInvoiceActivityKpis(activity, rows);
       renderStatusBreakdown(rows);
       renderLeaderboard(rows, classPL);
