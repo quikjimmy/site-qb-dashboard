@@ -67,6 +67,7 @@ module.exports = async (req, res) => {
       ccFee: num(overrides?.ccFee),
       warranty: num(overrides?.warranty),
       shipping: num(overrides?.shipping),
+      creditMemos: num(overrides?.creditMemos),
     };
     const cleanDeductions = (Array.isArray(deductions) ? deductions : []).map(d => ({
       id: String(d.id || '').slice(0, 40),

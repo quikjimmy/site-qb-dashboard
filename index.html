@@ -434,12 +434,12 @@
         <div class="kpi-card margin"><div class="label">Gross Margin %</div><div class="value" id="kpi-margin">—</div><div class="sub" id="kpi-margin-sub"></div></div>
       </div>
 
-      <!-- Invoice activity strip (secondary metrics) -->
-      <div class="kpi-strip" aria-label="Invoice activity">
-        <div class="item"><div class="label">Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
-        <div class="item"><div class="label">This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
-        <div class="item"><div class="label">This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
-        <div class="item"><div class="label">In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
+      <!-- Payment activity strip (cash-basis) -->
+      <div class="kpi-strip" aria-label="Payment activity">
+        <div class="item"><div class="label">Paid Today</div><div class="value" id="kpi-inv-today">—</div><div class="sub" id="kpi-inv-today-sub"></div></div>
+        <div class="item"><div class="label">Paid This Week</div><div class="value" id="kpi-inv-week">—</div><div class="sub" id="kpi-inv-week-sub"></div></div>
+        <div class="item"><div class="label">Paid This Month</div><div class="value" id="kpi-inv-month">—</div><div class="sub" id="kpi-inv-month-sub"></div></div>
+        <div class="item"><div class="label">Paid In Range</div><div class="value" id="kpi-inv-range">—</div><div class="sub" id="kpi-inv-range-sub"></div></div>
       </div>
 
       <!-- Status breakdown -->
@@ -563,8 +563,16 @@
           <button id="save-all-reps" class="save-all-btn hidden" type="button" onclick="saveAllReps(this)">Save All</button>
         </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>Paid Date</th><th>Invoice #</th><th>Customer</th><th>Rep</th><th>Amount</th><th>Paid $</th><th>Commission</th></tr></thead>
+          <table class="sortable-table" id="invoices-table">
+            <thead><tr>
+              <th data-sort="paidDate" class="sort-active">Paid Date <span class="sort-ind" aria-hidden="true">↓</span></th>
+              <th data-sort="docNum">Invoice #</th>
+              <th data-sort="customer">Customer</th>
+              <th data-sort="rep">Rep</th>
+              <th data-sort="amount">Amount</th>
+              <th data-sort="paidAmount">Paid $</th>
+              <th data-sort="commissionStatus">Commission</th>
+            </tr></thead>
             <tbody id="invoices-tbody"><tr><td colspan="7" class="loading-overlay"><div class="spinner"></div>Loading…</td></tr></tbody>
           </table>
         </div>
@@ -833,6 +841,7 @@ function showDashboard() {
   wireProductSort();
   wireProductFilter();
   wireLeaderboardClick();
+  wireInvoicesSort();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   const [s, e] = defaultDateRange();
@@ -926,6 +935,7 @@ function loadDemoData() {
   wireProductSort();
   wireProductFilter();
   wireLeaderboardClick();
+  wireInvoicesSort();
   const initialPage = location.hash === '#attention' ? 'attention' : 'dashboard';
   showPage(initialPage);
   $('kpi-revenue').textContent = fmt(d.kpis.revenue);
@@ -1218,6 +1228,57 @@ async function saveAllReps(btn) {
   updateSaveAllButton();
 }
 
+let _invoicesSort = { col: 'paidDate', dir: 'desc' };
+const _invoicesColDirDefault = { paidDate: 'desc', docNum: 'asc', customer: 'asc', rep: 'asc', amount: 'desc', paidAmount: 'desc', commissionStatus: 'asc' };
+
+function invoiceRowValue(r, col) {
+  switch (col) {
+    case 'paidDate': return r.paidDate || '';
+    case 'docNum': return r.docNum || '';
+    case 'customer': return (r.customer || '').toLowerCase();
+    case 'rep': return (r.rep || '').toLowerCase();
+    case 'amount': return Number(r.amount) || 0;
+    case 'paidAmount': return Number(r.paidAmount) || 0;
+    case 'commissionStatus': return r.commissionStatus || '';
+    default: return '';
+  }
+}
+
+function refreshInvoicesSortIndicators() {
+  const { col, dir } = _invoicesSort;
+  document.querySelectorAll('#invoices-table thead th').forEach(th => {
+    const active = th.dataset.sort === col;
+    th.classList.toggle('sort-active', active);
+    let ind = th.querySelector('.sort-ind');
+    if (!active) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = document.createElement('span');
+      ind.className = 'sort-ind';
+      ind.setAttribute('aria-hidden', 'true');
+      th.appendChild(document.createTextNode(' '));
+      th.appendChild(ind);
+    }
+    ind.textContent = dir === 'asc' ? '↑' : '↓';
+  });
+}
+
+function wireInvoicesSort() {
+  document.querySelectorAll('#invoices-table thead th').forEach(th => {
+    if (th._wired) return;
+    th._wired = true;
+    th.addEventListener('click', () => {
+      const col = th.dataset.sort;
+      if (!col) return;
+      if (_invoicesSort.col === col) {
+        _invoicesSort.dir = _invoicesSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _invoicesSort = { col, dir: _invoicesColDirDefault[col] || 'desc' };
+      }
+      applyInvoiceFilters();
+    });
+  });
+}
+
 function applyInvoiceFilters() {
   const statusFilter = $('invoice-filter-status').value;
   const repFilter = $('invoice-filter-rep').value;
@@ -1225,8 +1286,16 @@ function applyInvoiceFilters() {
     (!statusFilter || r.status === statusFilter) &&
     (!repFilter || r.rep === repFilter)
   );
-  const sorted = [...filtered].sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || ''));
-  renderInvoicesTable(sorted);
+  const { col, dir } = _invoicesSort;
+  filtered.sort((a, b) => {
+    const va = invoiceRowValue(a, col);
+    const vb = invoiceRowValue(b, col);
+    if (va < vb) return dir === 'asc' ? -1 : 1;
+    if (va > vb) return dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+  refreshInvoicesSortIndicators();
+  renderInvoicesTable(filtered);
 }
 
 function populateInvoiceRepFilter(rows) {
@@ -1345,7 +1414,7 @@ async function loadMonthlyPL(endDate) {
   const months = lastMonths(endDate, 6);
   const startDate = months[0].start;
   const finalEnd = months[months.length - 1].end;
-  const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${finalEnd}&summarize_column_by=Month`);
+  const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${finalEnd}&summarize_column_by=Month&accounting_method=Cash`);
   const rows = pl?.Rows?.Row || [];
   const income = (findPLSection(rows, ['Total Income']) || []).slice(0, months.length);
   const cogs = (findPLSection(rows, ['Total Cost of Goods Sold']) || []).slice(0, months.length).map(Math.abs);
@@ -1356,7 +1425,7 @@ async function loadMonthlyPL(endDate) {
 
 async function loadKPIs(startDate, endDate) {
   try {
-    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Total`);
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Total&accounting_method=Cash`);
     const rows = pl?.Rows?.Row || [];
     const income = findPLSection(rows, ['Total Income'])?.[0] || 0;
     const cogs = Math.abs(findPLSection(rows, ['Total Cost of Goods Sold'])?.[0] || 0);
@@ -1386,7 +1455,7 @@ async function loadWeeklyPL(endDate) {
   const endStr = ymd(weekEnd);
 
   try {
-    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startStr}&end_date=${endStr}&summarize_column_by=Days`);
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startStr}&end_date=${endStr}&summarize_column_by=Days&accounting_method=Cash`);
     const cols = pl?.Columns?.Column || [];
     const dayStarts = [];
     for (let i = 1; i < cols.length; i++) {
@@ -1520,25 +1589,43 @@ async function loadAllInvoices(startDate, endDate) {
 }
 
 async function loadInvoiceActivity() {
+  // Cash-basis activity: count distinct invoices that received payments in each window.
   const today = new Date();
   const start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   const startStr = ymd(start);
   const endStr = ymd(today);
   try {
-    const data = await qbQuery(`SELECT * FROM Invoice WHERE TxnDate >= '${startStr}' AND TxnDate <= '${endStr}' MAXRESULTS 1000`);
-    const invoices = data?.Invoice || [];
+    const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startStr}' AND TxnDate <= '${endStr}' MAXRESULTS 1000`);
+    const payments = data?.Payment || [];
     const todayStr = ymd(today);
     const weekStartStr = ymd(weekStart(today));
     const monthStartStr = ymd(new Date(today.getFullYear(), today.getMonth(), 1));
-    const sumIf = pred => invoices.filter(pred).reduce((s, inv) => s + (Number(inv.TotalAmt) || 0), 0);
-    const countIf = pred => invoices.filter(pred).length;
+    const buckets = {
+      today: { count: new Set(), amt: 0 },
+      week: { count: new Set(), amt: 0 },
+      month: { count: new Set(), amt: 0 },
+    };
+    for (const p of payments) {
+      const date = p.TxnDate;
+      if (!date) continue;
+      const inToday = date === todayStr;
+      const inWeek = date >= weekStartStr && date <= todayStr;
+      const inMonth = date >= monthStartStr && date <= todayStr;
+      for (const line of (p.Line || [])) {
+        const amt = Number(line.Amount) || 0;
+        if (amt === 0) continue;
+        for (const linked of (line.LinkedTxn || [])) {
+          if (linked.TxnType !== 'Invoice' || !linked.TxnId) continue;
+          if (inToday) { buckets.today.count.add(linked.TxnId); buckets.today.amt += amt; }
+          if (inWeek)  { buckets.week.count.add(linked.TxnId);  buckets.week.amt  += amt; }
+          if (inMonth) { buckets.month.count.add(linked.TxnId); buckets.month.amt += amt; }
+        }
+      }
+    }
     return {
-      today: countIf(inv => inv.TxnDate === todayStr),
-      todayAmt: sumIf(inv => inv.TxnDate === todayStr),
-      week: countIf(inv => inv.TxnDate >= weekStartStr && inv.TxnDate <= todayStr),
-      weekAmt: sumIf(inv => inv.TxnDate >= weekStartStr && inv.TxnDate <= todayStr),
-      month: countIf(inv => inv.TxnDate >= monthStartStr && inv.TxnDate <= todayStr),
-      monthAmt: sumIf(inv => inv.TxnDate >= monthStartStr && inv.TxnDate <= todayStr),
+      today: buckets.today.count.size,  todayAmt: buckets.today.amt,
+      week: buckets.week.count.size,    weekAmt: buckets.week.amt,
+      month: buckets.month.count.size,  monthAmt: buckets.month.amt,
     };
   } catch {
     return { today: 0, todayAmt: 0, week: 0, weekAmt: 0, month: 0, monthAmt: 0 };
@@ -1547,12 +1634,12 @@ async function loadInvoiceActivity() {
 
 function renderInvoiceActivityKpis(activity, rangeRows) {
   $('kpi-inv-today').textContent = String(activity.today);
-  $('kpi-inv-today-sub').textContent = activity.today ? fmt(activity.todayAmt) : 'No invoices yet today';
+  $('kpi-inv-today-sub').textContent = activity.today ? fmt(activity.todayAmt) : 'No payments yet today';
   $('kpi-inv-week').textContent = String(activity.week);
   $('kpi-inv-week-sub').textContent = fmt(activity.weekAmt);
   $('kpi-inv-month').textContent = String(activity.month);
   $('kpi-inv-month-sub').textContent = fmt(activity.monthAmt);
-  const rangeAmt = rangeRows.reduce((s, r) => s + r.amount, 0);
+  const rangeAmt = rangeRows.reduce((s, r) => s + (Number(r.paidAmount) || 0), 0);
   $('kpi-inv-range').textContent = String(rangeRows.length);
   $('kpi-inv-range-sub').textContent = fmt(rangeAmt);
 }
@@ -2187,7 +2274,7 @@ let _attentionFlag = null;
 async function loadClassPL(startDate, endDate) {
   const map = new Map();
   try {
-    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Classes`);
+    const pl = await apiFetch(`/reports/ProfitAndLoss?start_date=${startDate}&end_date=${endDate}&summarize_column_by=Classes&accounting_method=Cash`);
     const cols = pl?.Columns?.Column || [];
     // First column is the label, subsequent columns are classes (and possibly a Total at the end)
     const classNames = cols.slice(1).map(c => c.ColTitle || '');
@@ -2259,13 +2346,19 @@ async function refreshDashboard() {
       }));
       buildCustomerHistoryIdx(histRows);
       populateInvoiceRepFilter([...rows, ..._paidInRangeRows]);
-      renderInvoiceActivityKpis(activity, rows);
-      renderStatusBreakdown(rows);
-      renderLeaderboard(rows, classPL);
+      renderInvoiceActivityKpis(activity, _paidInRangeRows);
+      renderStatusBreakdown(_paidInRangeRows);
+      renderLeaderboard(_paidInRangeRows, classPL);
       renderAttention(rows);
-      renderPivot(rows);
+      renderPivot(_paidInRangeRows);
       applyInvoiceFilters();
-      loadTopProducts(filteredRaw);
+      // Top Products: use the paid-in-range invoices, optionally filtered by product
+      const paidIds = new Set(_paidInRangeRows.map(r => r.id));
+      const paidInvoicesForProducts = wideInvoices.filter(inv =>
+        paidIds.has(inv.Id) &&
+        (!productFilter || (inv.Line || []).some(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef?.name === productFilter))
+      );
+      loadTopProducts(paidInvoicesForProducts);
     })(),
   ]);
 }
@@ -2306,7 +2399,7 @@ let _commissionState = {
   status: 'draft',
   ccRate: 3,
   warrantyRate: 3,
-  overrides: { tax: null, ccFee: null, warranty: null, shipping: null }, // null = use auto
+  overrides: { tax: null, ccFee: null, warranty: null, shipping: null, creditMemos: null }, // null = use auto
   customDeductions: [],   // [{id, label, amount}]
   metrics: null,
   lastMetrics: null,
@@ -2347,6 +2440,13 @@ async function fetchPaymentsForMonth(startDate, endDate) {
   try {
     const data = await qbQuery(`SELECT * FROM Payment WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
     return data?.Payment || [];
+  } catch { return []; }
+}
+
+async function fetchCreditMemosForRepMonth(rep, startDate, endDate) {
+  try {
+    const data = await qbQuery(`SELECT * FROM CreditMemo WHERE TxnDate >= '${startDate}' AND TxnDate <= '${endDate}' MAXRESULTS 1000`);
+    return (data?.CreditMemo || []).filter(cm => cm.ClassRef?.name === rep);
   } catch { return []; }
 }
 
@@ -2451,10 +2551,18 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
             result.cogs += unitCost * proratedQty;
             result.revenueWithCost += proratedAmt;
           }
-          const sku = result.skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0 };
+          const sku = result.skus.get(name) || { qty: 0, revenue: 0, hasCost: false, unitCost: 0, invoices: new Map() };
           sku.qty += proratedQty;
           sku.revenue += proratedAmt;
           if (unitCost > 0) { sku.hasCost = true; sku.unitCost = unitCost; }
+          let invEntry = sku.invoices.get(ltxn.TxnId);
+          if (!invEntry) {
+            invEntry = { id: ltxn.TxnId, docNum: inv.DocNumber, customer: inv.CustomerRef?.name || null, qty: 0, amount: 0, paidDate: payDate };
+            sku.invoices.set(ltxn.TxnId, invEntry);
+          }
+          invEntry.qty += proratedQty;
+          invEntry.amount += proratedAmt;
+          if (payDate && (!invEntry.paidDate || payDate > invEntry.paidDate)) invEntry.paidDate = payDate;
           result.skus.set(name, sku);
         }
 
@@ -2495,10 +2603,11 @@ function computeCashBasisMetrics(rep, payments, invoicesById, costMap) {
 
 function buildAutoDeductions(metrics, ccRate, warrantyRate) {
   return [
-    { key: 'tax',      label: 'Tax',                basis: 'TxnTaxDetail.TotalTax (per invoice)', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.tax },
-    { key: 'ccFee',    label: 'Credit card fee',    basis: `Paid via CC (${fmt(metrics.ccPaid)}) × rate`, editableRate: true, rate: ccRate, ccPaid: metrics.ccPaid, autoAmount: metrics.ccPaid * (ccRate / 100) },
-    { key: 'warranty', label: 'Warranty holdback',  basis: `Revenue × rate`, editableRate: true, rate: warrantyRate, ccPaid: 0, autoAmount: metrics.revenue * (warrantyRate / 100) },
-    { key: 'shipping', label: 'Shipping',           basis: 'Sum of shipping/freight line items', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.shipping },
+    { key: 'tax',          label: 'Tax',                  basis: 'TxnTaxDetail.TotalTax (per invoice)', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.tax },
+    { key: 'ccFee',        label: 'Credit card fee',      basis: `Paid via CC (${fmt(metrics.ccPaid)}) × rate`, editableRate: true, rate: ccRate, ccPaid: metrics.ccPaid, autoAmount: metrics.ccPaid * (ccRate / 100) },
+    { key: 'warranty',     label: 'Warranty holdback',    basis: 'Revenue × rate', editableRate: true, rate: warrantyRate, ccPaid: 0, autoAmount: metrics.revenue * (warrantyRate / 100) },
+    { key: 'shipping',     label: 'Shipping',             basis: 'Sum of shipping/freight line items', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.shipping },
+    { key: 'creditMemos',  label: 'Credit memos (refunds)', basis: 'Sum of credit memos issued this period for this rep', editableRate: false, rate: null, ccPaid: 0, autoAmount: metrics.creditMemos || 0 },
   ];
 }
 
@@ -2524,17 +2633,22 @@ async function loadCommissionReport() {
   const lookbackStr = ymd(lookback);
 
   try {
-    const [thisPayments, lastPayments, allInvoices, costMap, saved] = await Promise.all([
+    const [thisPayments, lastPayments, allInvoices, costMap, saved, creditMemos, lastCreditMemos] = await Promise.all([
       fetchPaymentsForMonth(start, end),
       fetchPaymentsForMonth(pStart, pEnd),
       loadAllInvoices(lookbackStr, end),
       loadItemCostMap(),
       loadCommissionConfig(rep, month),
+      fetchCreditMemosForRepMonth(rep, start, end),
+      fetchCreditMemosForRepMonth(rep, pStart, pEnd),
     ]);
     const invoicesById = new Map(allInvoices.map(i => [i.Id, i]));
 
     const metrics = computeCashBasisMetrics(rep, thisPayments, invoicesById, costMap);
+    metrics.creditMemos = creditMemos.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
+    metrics.creditMemoList = creditMemos;
     const lastMetrics = computeCashBasisMetrics(rep, lastPayments, invoicesById, costMap);
+    lastMetrics.creditMemos = lastCreditMemos.reduce((s, cm) => s + (Number(cm.TotalAmt) || 0), 0);
 
     _commissionState = {
       rep, month,
@@ -2542,7 +2656,7 @@ async function loadCommissionReport() {
       status: saved.status || 'draft',
       ccRate: saved.ccRate ?? 3,
       warrantyRate: saved.warrantyRate ?? 3,
-      overrides: { tax: saved.overrides?.tax ?? null, ccFee: saved.overrides?.ccFee ?? null, warranty: saved.overrides?.warranty ?? null, shipping: saved.overrides?.shipping ?? null },
+      overrides: { tax: saved.overrides?.tax ?? null, ccFee: saved.overrides?.ccFee ?? null, warranty: saved.overrides?.warranty ?? null, shipping: saved.overrides?.shipping ?? null, creditMemos: saved.overrides?.creditMemos ?? null },
       customDeductions: (saved.deductions || []).map(d => ({ ...d })),
       metrics, lastMetrics,
       autoDeductions: buildAutoDeductions(metrics, saved.ccRate ?? 3, saved.warrantyRate ?? 3),
@@ -2871,20 +2985,51 @@ function renderCogsQuality(metrics) {
       : `· all ${skus.length} SKUs have cost data ✓`;
     summary.style.color = missing.length ? 'var(--orange)' : 'var(--qb-green)';
   }
-  tbody.innerHTML = skus.map(([name, s]) => {
+  const dash = '<span style="color:var(--text2);">—</span>';
+  tbody.innerHTML = skus.map(([name, s], i) => {
     const implied = s.hasCost ? s.unitCost * s.qty : null;
-    const dash = '<span style="color:var(--text2);">—</span>';
-    return `<tr class="cogs-row ${s.hasCost ? '' : 'missing'}">
-      <td><strong>${attrEscape(name)}</strong></td>
-      <td>${s.qty || dash}</td>
-      <td>${fmt(s.revenue)}</td>
-      <td>${s.hasCost ? fmt(s.unitCost) : dash}</td>
-      <td>${implied != null ? fmt(implied) : dash}</td>
-      <td>${s.hasCost
-        ? '<span class="badge paid">HAS COST</span>'
-        : '<span class="badge overdue">NO COST</span>'}</td>
-    </tr>`;
+    const detailId = `cogs-detail-${i}`;
+    const toggleId = `cogs-toggle-${i}`;
+    const invList = s.invoices ? [...s.invoices.values()].sort((a, b) => (b.paidDate || '').localeCompare(a.paidDate || '')) : [];
+    const subRows = invList.length
+      ? invList.map(info => `<tr class="clickable" onclick="event.stopPropagation();openInvoiceInQb('${info.id}')" title="Open in QuickBooks">
+          <td><strong>${attrEscape(info.docNum || '—')}</strong></td>
+          <td>${attrEscape(info.customer || '—')}</td>
+          <td>${info.qty.toFixed(2)}</td>
+          <td>${fmt(info.amount)}</td>
+          <td>${info.paidDate || '—'}</td>
+        </tr>`).join('')
+      : `<tr><td colspan="5" style="text-align:center;color:var(--text2);">No invoice data.</td></tr>`;
+    return `
+      <tr class="cogs-row clickable ${s.hasCost ? '' : 'missing'}" onclick="toggleSkuRow('${detailId}','${toggleId}')" title="Click to see invoices for this SKU">
+        <td><span id="${toggleId}" style="display:inline-block;width:12px;color:var(--text2);">▸</span> <strong>${attrEscape(name)}</strong> <span style="color:var(--text2);font-size:.7rem;font-weight:400;">· ${invList.length} invoice${invList.length === 1 ? '' : 's'}</span></td>
+        <td>${s.qty ? s.qty.toFixed(2) : dash}</td>
+        <td>${fmt(s.revenue)}</td>
+        <td>${s.hasCost ? fmt(s.unitCost) : dash}</td>
+        <td>${implied != null ? fmt(implied) : dash}</td>
+        <td>${s.hasCost
+          ? '<span class="badge paid">HAS COST</span>'
+          : '<span class="badge overdue">NO COST</span>'}</td>
+      </tr>
+      <tr id="${detailId}" class="hidden" style="background:var(--surface-2);">
+        <td colspan="6" style="padding:8px 12px;">
+          <table style="width:100%;font-size:.8rem;">
+            <thead><tr><th>Invoice #</th><th>Customer</th><th>Qty</th><th>Amount</th><th>Pay Date</th></tr></thead>
+            <tbody>${subRows}</tbody>
+          </table>
+        </td>
+      </tr>
+    `;
   }).join('');
+}
+
+function toggleSkuRow(detailId, toggleId) {
+  const detail = document.getElementById(detailId);
+  const toggle = document.getElementById(toggleId);
+  if (!detail) return;
+  const wasHidden = detail.classList.contains('hidden');
+  detail.classList.toggle('hidden');
+  if (toggle) toggle.textContent = wasHidden ? '▾' : '▸';
 }
 
 function renderCommissionCustomerTable(thisMonth, lastMonth) {
